@@ -714,6 +714,60 @@ class StarTileDecoder(TileDecoder):
         return self._trim_source(psf)
 
 
+## FNP
+from bliss.models.fnp import FNP
+
+
+class FNPStarTileDecoder(TileDecoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        raise NotImplementedError("Work in progess; do not use this class yet.")
+        self.fnp = FNP()
+
+    def forward(self, locs, fluxes, star_bool, img, ref_points):
+
+        ## Split locs and fluxes into references
+        XR, yR, XM, yM = self._get_features_and_stamps(
+            img, locs, fluxes, star_bool, ref_points
+        )
+
+        ## Sample image
+        ## This will resample yR
+        y = self.fnp.predict(torch.cat([XR, XM], dim=0), XR, yR)
+
+        # psf = self._adjust_psf()
+        n_ptiles = locs.shape[0]
+        max_sources = locs.shape[1]
+
+        assert fluxes.shape[0] == star_bool.shape[0] == n_ptiles
+        assert fluxes.shape[1] == star_bool.shape[1] == max_sources
+        assert fluxes.shape[2] == self.n_bands
+        assert star_bool.shape[2] == 1
+
+        # all stars are just the PSF so we copy it.
+        # expanded_psf = psf.expand(n_ptiles, self.n_bands, -1, -1)
+        expanded_psf = y
+
+        # this loop plots each of the ith star in each of the (n_ptiles) images.
+        ptile_shape = (n_ptiles, self.n_bands, self.ptile_slen, self.ptile_slen)
+        ptile = torch.zeros(ptile_shape, device=locs.device)
+
+        assert fluxes.shape[0] == star_bool.shape[0] == n_ptiles
+        assert fluxes.shape[1] == star_bool.shape[1] == max_sources
+        assert fluxes.shape[2] == self.n_bands
+        assert star_bool.shape[2] == 1
+
+        for n in range(max_sources):
+            star_bool_n = star_bool[:, n]
+            locs_n = locs[:, n, :]
+            fluxes_n = fluxes[:, n, :] * star_bool_n.view(-1, 1)
+            fluxes_n = fluxes_n.view(n_ptiles, self.n_bands, 1, 1)
+            one_star = self._render_one_source(locs_n, expanded_psf)
+            ptile += one_star * fluxes_n
+
+        return ptile
+
+
 class GalaxyTileDecoder(TileDecoder):
     def __init__(
         self,
