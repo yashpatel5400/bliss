@@ -1,3 +1,4 @@
+from bliss.utils import ConcatLayer, MLP, NormalEncoder, SequentialVarg, SplitLayer
 import warnings
 from pathlib import Path
 
@@ -495,6 +496,10 @@ class TileDecoder(nn.Module):
         # grid: between -1 and 1,
         # then scale slightly because of the way f.grid_sample
         # parameterizes the edges: (0, 0) is center of edge pixel
+        # self.register_buffer(
+        #     "cached_grid", get_mgrid(self.ptile_slen), persistent=False
+        # )
+        # self.register_buffer("swap", torch.tensor([1, 0]), persistent=False)
 
     def _trim_source(self, source):
         """Crop the source to length ptile_slen x ptile_slen, centered at the middle."""
@@ -685,7 +690,7 @@ class StarTileDecoder(TileDecoder):
 
 
 ## FNP
-from bliss.models.fnp import FNP
+from bliss.models.fnp import AveragePooler, DepGraph, FNP
 
 
 class FNPStarTileDecoder(TileDecoder):
@@ -694,11 +699,17 @@ class FNPStarTileDecoder(TileDecoder):
         raise NotImplementedError("Work in progess; do not use this class yet.")
         self.fnp = FNP()
 
-    def forward(self, locs, fluxes, star_bool, img, ref_points):
+    def forward(self, locs, fluxes, star_bool, tiled_img, ref_points):
+        # locs: is (n_ptiles x max_num_stars x 2)
+        # fluxes: Is (n_ptiles x n_bands x max_stars)
+        # star_bool: Is (n_ptiles x max_stars x 1)
+        # max_sources obtained from locs, allows for more flexibility when rendering
+        # tiled_img: n_ptiles x n_bands x ptile_slen x ptile_slen
+        # ref_points: array of tiles which are reference points
 
         ## Split locs and fluxes into references
         XR, yR, XM, yM = self._get_features_and_stamps(
-            img, locs, fluxes, star_bool, ref_points
+            tiled_img, locs, fluxes, star_bool, ref_points
         )
 
         ## Sample image
@@ -736,6 +747,34 @@ class FNPStarTileDecoder(TileDecoder):
             ptile += one_star * fluxes_n
 
         return ptile
+
+    def _initialize_fnp(self):
+        dim_x = 2 + 1
+        dim_u = 3
+        dim_z = 8
+
+        cov_vencoder = SequentialVarg(
+            MLP(dim_x, [100], 2 * dim_u), SplitLayer(dim_u, -1), NormalEncoder()
+        )
+
+        dep_graph = DepGraph(dim_u)
+
+        # trans_cond_y = MLP(dim_y, [128], dim_y)
+
+        pooler = SequentialVarg(
+            AveragePooler(dim_z), SplitLayer(dim_z, -1), NormalEncoder(minscale=1e-8)
+        )
+
+        # label_vdecoder = SequentialVarg(
+        #     ConcatLayer(output_in),
+        #     MLP(output_insize, [128], 2 +
+        # )
+
+        # prop_vencoder = SequentialVarg(
+        #     ConcatLayer(),
+        #     MLP
+        # )
+
 
 class Tiler(nn.Module):
     """
@@ -785,6 +824,54 @@ class Tiler(nn.Module):
 
         source_rendered = F.grid_sample(source, grid_loc, align_corners=True)
         return source_rendered
+
+
+class FNPStarTileConditionalEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+
+class FNPStarTileLabeller(nn.Module):
+    def __init__(self, ptile_slen):
+        super().__init__()
+        self.tiler = Tiler(ptile_slen)
+
+    def forward(self, Z, X):
+        """
+        Z: N_tiles x Max_sources x D
+        X: Tuple consisting of:
+         - locs: N_tiles x Max_sources x 2
+         - fluxes: N_tildes x Max_sources x n_bands
+         - star_bool: N_tildes x Max_sources x 1
+
+        The output is the mean of the tile. The likelihood of this is calculated
+        upstream in the decoder.
+        """
+        locs, fluxes, star_bool = X
+        ## Make stamps (N_tiles x M x D) -> (N_tiles x M x n_bands x D x D)
+        P = self.f_stamp(Z)
+
+        ## Aggregate stamps into a single tile
+        n_ptiles = locs.shape[0]
+        max_sources = locs.shape[1]
+        ptile_shape = (n_ptiles, self.n_bands, self.ptile_slen, self.ptile_slen)
+        ptile = torch.zeros(ptile_shape, device=locs.device)
+
+        assert fluxes.shape[0] == star_bool.shape[0] == n_ptiles
+        assert fluxes.shape[1] == star_bool.shape[1] == max_sources
+        assert fluxes.shape[2] == self.n_bands
+        assert star_bool.shape[2] == 1
+
+        # this loop plots each of the ith star in each of the (n_ptiles) images.
+        for n in range(max_sources):
+            star_bool_n = star_bool[:, n]
+            locs_n = locs[:, n, :]
+            fluxes_n = fluxes[:, n, :] * star_bool_n.view(-1, 1)
+            fluxes_n = fluxes_n.view(n_ptiles, self.n_bands, 1, 1)
+            one_star = self.tiler.render_one_source(locs_n, P[:, n])
+            ptile += one_star * fluxes_n
+
+        return ptile
 
 
 class GalaxyTileDecoder(TileDecoder):
