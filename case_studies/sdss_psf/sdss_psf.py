@@ -38,14 +38,14 @@ class SDSS(Dataset):
 
     def makeitem(self, idx):
         data = self.sdss_source[idx]
-        img = data["image"][self.band]
+        img = torch.from_numpy(data["image"][self.band]).float()
         locs = torch.stack((torch.from_numpy(data["prs"]), torch.from_numpy(data["pts"])), dim=1)
         X = (locs - locs.mean(0)) / locs.std(0)
 
         ## Randomize order
         idxs = np.random.choice(X.size(0), X.size(0), replace=False)
-        X = X[idxs]
-        locs = locs[idxs]
+        X = X[idxs].float()
+        locs = locs[idxs].float()
 
         return (X, img, locs)
 
@@ -78,20 +78,20 @@ sdss_source = sdss.SloanDigitalSkySurvey(
     Path(bliss.__file__).parents[1].joinpath("data/sdss_all"),
     run=3900,
     camcol=6,
-    fields=range(300, 1000),
-    # fields=(808,),
+    # fields=range(300, 1000),
+    fields=(808,),
     bands=range(5),
 )
 
 
 #%%
 # Pickle
-sdss_dataset_file = Path("sdss_source.pkl")
-if sdss_dataset_file.exists() is False:
-    sdss_dataset = SDSS(sdss_source)
-    torch.save(sdss_dataset, sdss_dataset_file)
-else:
-    sdss_dataset = torch.load(sdss_dataset_file)
+# sdss_dataset_file = Path("sdss_source.pkl")
+# if sdss_dataset_file.exists() is False:
+sdss_dataset = SDSS(sdss_source)
+#     torch.save(sdss_dataset, sdss_dataset_file)
+# else:
+#     sdss_dataset = torch.load(sdss_dataset_file)
 
 #%%
 pl = sdss_dataset.plot_clustered_locs(0)

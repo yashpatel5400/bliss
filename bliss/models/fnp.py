@@ -570,14 +570,15 @@ class StarHNP(HNP):
         dy = stampsize ** 2
         dep_graph = KMeansDepGraph(n_clusters=n_clusters)
         z_inference = SequentialVarg(ConcatLayer([1]), MLP(dy, [16, 8], dz))
-
-        z_pooler = SimpleZPooler(dz)
+        dh = dz
+        z_pooler = AttentionZPooler(2, dh, dz)
 
         h_prior = lambda X, G: Normal(
             torch.zeros(G.size(1), dz, device=G.device), torch.ones(G.size(1), dz, device=G.device)
         )
 
         h_pooler = SimpleHPooler(dz)
+        # h_pooler = AttentionHPooler(2, dz)
 
         y_decoder = SequentialVarg(
             ConcatLayer([0]),
@@ -716,3 +717,56 @@ class SimpleHPooler(nn.Module):
         precis = 1.0 + G.sum(1)
         std = precis.reciprocal().sqrt().unsqueeze(1).repeat(1, z_pooled.size(1))
         return Normal(z_pooled, std)
+
+
+from torch.nn import MultiheadAttention
+
+
+class ResMLP(MLP):
+    def __init__(self, in_features, hs, act=nn.ReLU, final=None):
+        super().__init__(in_features, hs, in_features, act, final)
+
+    def forward(self, X):
+        r = super().forward(X)
+        return X + r
+
+
+class AttentionZPooler(nn.Module):
+    def __init__(self, dim_x, dh, dz, num_heads_x=4, num_heads=2):
+        super().__init__()
+        self.dim_x = dim_x
+        self.dim_x_embeded = dim_x * num_heads_x
+        self.dh = dh
+        self.dz = dz
+        self.num_heads_x = num_heads_x
+        self.num_heads = num_heads
+        ##
+        self.fc_x = ResMLP(self.dim_x_embeded, [8, 8, 8])
+        self.fc_1 = ResMLP(self.dim_x_embeded * 2, [16, 16, 16])
+        self.fc_2 = ResMLP(self.dim_x_embeded * 2, [16, 16, 16])
+        self.linear = nn.Linear(self.dim_x_embeded * 2, self.dz)
+        ## Averager for X
+        self.ap = AveragePooler(dim_x)
+        # First cross-attention block
+        self.mab1 = MultiheadAttention(self.dim_x * self.num_heads_x, self.num_heads_x, vdim=dh)
+        # First self-attention block
+        self.sab1 = MultiheadAttention(self.dim_x_embeded * 2, self.num_heads)
+
+    def forward(self, X, H, G):
+        X_tilde = self.ap(X, G.t())
+
+        X_embedded = torch.stack([X] * self.num_heads_x, dim=-1)
+        X_embedded = X_embedded.reshape(X_embedded.size(0), 1, -1)
+        X_embedded = self.fc_x(X_embedded)
+
+        X_tilde_embedded = torch.stack([X_tilde] * self.num_heads_x, dim=-1)
+        X_tilde_embedded = X_tilde_embedded.reshape(X_tilde_embedded.size(0), 1, -1)
+        X_tilde_embedded = self.fc_x(X_tilde_embedded)
+
+        Z = self.mab1(X_embedded, X_tilde_embedded, H.unsqueeze(1), need_weights=False)[0]
+        Z = torch.cat([X_embedded, Z], dim=-1)
+        Z = self.fc_1(Z)
+        Z = self.sab1(Z, Z, Z)[0]
+        Z = self.fc_2(Z)
+        Z = self.linear(Z)
+        return Z.squeeze(1)
