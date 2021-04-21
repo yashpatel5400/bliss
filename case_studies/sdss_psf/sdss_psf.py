@@ -326,6 +326,6 @@ X_test, Y_test = X[new_order], Y[new_order]
 S_test = Y_test[:200]
 x_test = m.predict(X_test, S_test)
 idxs = np.random.choice(range(200, Y.size(0)), 5, replace=False)
-p, a = plot_stars(Y[idxs], x_test[idxs])
+p, a = plot_stars(Y_test[idxs], x_test[idxs])
 p.savefig("random_predictions.png")
 # %%
