@@ -320,7 +320,12 @@ p.savefig("cluster_compare_0_200.png")
 mses = calc_mse(sdss_dataset, m)
 mses.to_csv("mses_sdss.csv")
 # %%
-idxs = np.random.choice(Y.size(0), 5, replace=False)
-p, a = plot_stars(Y[idxs], x[idxs])
+# Scramble order
+new_order = np.random.choice(Y.size(0), Y.size(0), replace=False)
+X_test, Y_test = X[new_order], Y[new_order]
+S_test = Y_test[:200]
+x_test = m.predict(X_test, S_test)
+idxs = np.random.choice(range(200, Y.size(0)), 5, replace=False)
+p, a = plot_stars(Y[idxs], x_test[idxs])
 p.savefig("random_predictions.png")
 # %%
