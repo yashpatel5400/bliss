@@ -15,6 +15,8 @@ from bliss.plotting import plot_image, plot_image_locs, _plot_locs
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 STAMPSIZE = 11
 
 #%%
@@ -110,8 +112,8 @@ else:
 # %%
 # torch.save(m.hnp.state_dict(), "star_hnp_state_dict.pt")
 # %%
-X, img, locs = sdss_dataset[20]
-X, S, Y = m.prepare_batch(sdss_dataset[20])
+X, img, locs = sdss_dataset[0]
+X, S, Y = m.prepare_batch(sdss_dataset[0])
 km = KMeans(n_clusters=m.n_clusters)
 c = km.fit_predict(locs.cpu().numpy())
 G = sdss_dataset.make_G_from_clust(c)
@@ -223,6 +225,48 @@ def pred_mean(m, X, S, n_samples):
     return torch.stack([m.predict(X, S) for i in range(n_samples)]).mean(0)
 
 
+# %%
+def plot_stars(y_true, y_pred):
+    # n_max = 0
+    # for i in np.unique(c):
+    #     if sum(c == i) > n_max:
+    #         n_max = sum(c == i)
+    figsize = (2 * 3 * 2, 10)
+    plot, axes = plt.subplots(nrows=y_true.size(0), ncols=3, figsize=figsize)
+    # in_posterior = np.array([False] * n_S + [True] * (len(c) - n_S))
+    for i in range(y_true.size(0)):
+        ax = axes[i, 0]
+        im = ax.imshow(y_true[i].reshape(STAMPSIZE, STAMPSIZE), interpolation="nearest")
+        ax.set_title("real")
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plot.colorbar(im, cax=cax, orientation="vertical")
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        ax = axes[i, 1]
+        im = ax.imshow(y_pred[i].reshape(STAMPSIZE, STAMPSIZE), interpolation="nearest")
+        # title = "post" if ipc[j] else "recn"
+        title = "post"
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        ax.set_title(title)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plot.colorbar(im, cax=cax, orientation="vertical")
+        ax = axes[i, 2]
+        im = ax.imshow(
+            (y_pred[i] - y_true[i]).reshape(STAMPSIZE, STAMPSIZE), interpolation="nearest"
+        )
+        title = "diff"
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        ax.set_title(title)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plot.colorbar(im, cax=cax, orientation="vertical")
+    return plot, axes
+
+
 #%%
 import pandas as pd
 
@@ -275,3 +319,8 @@ p.savefig("cluster_compare_0_200.png")
 # %%
 mses = calc_mse(sdss_dataset, m)
 mses.to_csv("mses_sdss.csv")
+# %%
+idxs = np.random.choice(Y.size(0), 5, replace=False)
+p, a = plot_stars(Y[idxs], x[idxs])
+p.savefig("random_predictions.png")
+# %%
