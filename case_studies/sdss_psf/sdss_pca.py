@@ -78,8 +78,8 @@ sdss_source = sdss.SloanDigitalSkySurvey(
     Path(bliss.__file__).parents[1].joinpath("data/sdss_all"),
     run=3900,
     camcol=6,
-    fields=range(300, 1000),
-    # fields=(808,),
+    # fields=range(300, 1000),
+    fields=(808,),
     bands=range(5),
 )
 
@@ -88,11 +88,11 @@ sdss_source = sdss.SloanDigitalSkySurvey(
 # Pickle
 sdss_dataset_file = Path("sdss_source.pkl")
 #%%
-if not sdss_dataset_file.exists():
-    sdss_dataset = SDSS(sdss_source)
-    torch.save(sdss_dataset, sdss_dataset_file)
-else:
-    sdss_dataset = torch.load(sdss_dataset_file)
+# if not sdss_dataset_file.exists():
+sdss_dataset = SDSS(sdss_source)
+# torch.save(sdss_dataset, sdss_dataset_file)
+# else:
+#     sdss_dataset = torch.load(sdss_dataset_file)
 
 #%%
 

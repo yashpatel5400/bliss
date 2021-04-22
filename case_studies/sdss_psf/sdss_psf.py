@@ -267,6 +267,28 @@ def plot_stars(y_true, y_pred):
     return plot, axes
 
 
+def plot_just_stars(y):
+    # n_max = 0
+    # for i in np.unique(c):
+    #     if sum(c == i) > n_max:
+    #         n_max = sum(c == i)
+    figsize = (2 * 3 * 2, 10)
+    plot, axes = plt.subplots(nrows=y.size(0) // 3, ncols=3, figsize=figsize)
+    axes = axes.flatten()
+    # in_posterior = np.array([False] * n_S + [True] * (len(c) - n_S))
+    for i in range(y.size(0)):
+        ax = axes[i]
+        im = ax.imshow(y[i].reshape(STAMPSIZE, STAMPSIZE), interpolation="nearest")
+        # ax.set_title("real")
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plot.colorbar(im, cax=cax, orientation="vertical")
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        plot.tight_layout()
+    return plot, axes
+
+
 #%%
 import pandas as pd
 
@@ -328,4 +350,20 @@ x_test = m.predict(X_test, S_test)
 idxs = np.random.choice(range(200, Y.size(0)), 5, replace=False)
 p, a = plot_stars(Y_test[idxs], x_test[idxs])
 p.savefig("random_predictions.png")
+# %%
+new_order = np.random.choice(Y.size(0), Y.size(0), replace=False)
+X_test, Y_test = X[new_order], Y[new_order]
+S_test = Y_test[:200]
+idxs2 = np.random.choice(range(Y.size(0)), 15, replace=False)
+x_test2 = m.predict(X_test, S_test[:0])
+p, a = plot_just_stars(x_test2[idxs2])
+p.savefig("prior_samples.png")
+# %%
+new_order = np.random.choice(Y.size(0), Y.size(0), replace=False)
+X_test, Y_test = X[new_order], Y[new_order]
+S_test = Y_test[:200]
+idxs2 = np.random.choice(range(Y.size(0)), 15, replace=False)
+x_test2 = m.predict(X_test, S_test[:0])
+p, a = plot_just_stars(Y_test[idxs2])
+p.savefig("star_samples.png")
 # %%
