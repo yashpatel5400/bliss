@@ -10,7 +10,7 @@ from torch.distributions import Poisson, Normal
 import pytorch_lightning as pl
 
 from .encoder import get_is_on_from_n_sources, get_mgrid
-from .fnp import StarHNP
+from .inp import StarHNP
 from . import galaxy_net
 
 
