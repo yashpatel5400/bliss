@@ -49,22 +49,25 @@ class FluxEncoderNet(nn.Module):
 
         # convolutional layers
         self.conv_layers = nn.Sequential(
-            nn.Conv2d(self.n_bands, 6, 3),
+            nn.Conv2d(self.n_bands, 6, 2, 2),
             nn.ReLU(),
-            nn.Conv2d(6, 16, 3),
+            nn.Conv2d(6, 16, 2, 2),
             nn.ReLU(),
-            nn.Conv2d(16, 16, 3),
+            nn.Conv2d(16, 16, 2, 2),
             nn.ReLU(),
             nn.Flatten(1),
         )
 
         # compute output dimension
-        conv_out_dim = (self.flux_tile_slen - 6) ** 2 * 16
+        # conv_out_dim = (self.flux_tile_slen - 6) ** 2 * 16
+        conv_out_dim = self.conv_layers(
+            torch.randn(1, self.n_bands, self.flux_tile_slen, self.flux_tile_slen)
+        ).shape[1]
+
+        print("conv_out_dim", conv_out_dim)
 
         self.fc_layers = nn.Sequential(
             nn.Linear(conv_out_dim, latent_dim),
-            nn.ReLU(),
-            nn.Linear(latent_dim, latent_dim),
             nn.ReLU(),
             nn.Linear(latent_dim, latent_dim),
             nn.ReLU(),
