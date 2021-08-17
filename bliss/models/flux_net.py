@@ -168,7 +168,7 @@ class FluxEstimator(pl.LightningModule):
 
         return self.enc.forward(images)
 
-    def kl_qp_flux_loss(self, batch, est_flux, est_flux_sd, alpha = 0.5):
+    def kl_qp_flux_loss(self, batch, est_flux, est_flux_sd, alpha=0.5):
 
         batchsize = batch["images"].shape[0]
         assert est_flux.shape == batch["fluxes"].shape
@@ -192,23 +192,38 @@ class FluxEstimator(pl.LightningModule):
         star_bool = get_star_bool(batch["n_sources"], batch["galaxy_bool"])
         entropy = torch.log(est_flux_sd) * star_bool
         entropy = entropy.view(batchsize, -1).sum(1)
-        
-        # log prior 
-        log_prior = -(alpha + 1) * torch.log(est_flux.clamp(min = 1e-6))
+
+        # log prior
+        log_prior = -(alpha + 1) * torch.log(est_flux.clamp(min=1e-6))
         log_prior = (log_prior * star_bool).view(batchsize, -1).sum(1)
-        
+
         # negative elbo
         kl = -(loglik + entropy + log_prior)
 
         return kl, recon
 
+    def kl_pq_flux_loss(self, batch, est_flux, est_flux_sd):
+
+        batchsize = batch["fluxes"].shape[0]
+
+        truth = batch["fluxes"]
+        star_bool = get_star_bool(batch["n_sources"], batch["galaxy_bool"])
+
+        # log likelihood
+        scale = est_flux_sd.clamp(min=1.0)
+        norm = normal.Normal(loc=est_flux, scale=scale)
+        kl = -(norm.log_prob(batch["fluxes"]) * star_bool).view(batchsize, -1).sum(1)
+
+        return kl
+
     def get_loss(self, batch):
         out = self.enc(batch["images"])
 
         # get loss
-        kl, _ = self.kl_qp_flux_loss(batch, out["samples"], out["sd"])
+        kl_qp, _ = self.kl_qp_flux_loss(batch, out["samples"], out["sd"])
+        # kl_pq = self.kl_pq_flux_loss(batch, out["mean"], out["sd"])
 
-        return kl.mean()
+        return kl_qp.mean()
 
     # ---------------
     # Optimizer
