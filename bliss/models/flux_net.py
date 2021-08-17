@@ -168,7 +168,7 @@ class FluxEstimator(pl.LightningModule):
 
         return self.enc.forward(images)
 
-    def kl_qp_flux_loss(self, batch, est_flux, est_flux_sd):
+    def kl_qp_flux_loss(self, batch, est_flux, est_flux_sd, alpha = 0.5):
 
         batchsize = batch["images"].shape[0]
         assert est_flux.shape == batch["fluxes"].shape
@@ -192,9 +192,13 @@ class FluxEstimator(pl.LightningModule):
         star_bool = get_star_bool(batch["n_sources"], batch["galaxy_bool"])
         entropy = torch.log(est_flux_sd) * star_bool
         entropy = entropy.view(batchsize, -1).sum(1)
-
+        
+        # log prior 
+        log_prior = -(alpha + 1) * torch.log(est_flux.clamp(min = 1e-6))
+        log_prior = (log_prior * star_bool).view(batchsize, -1).sum(1)
+        
         # negative elbo
-        kl = -(loglik + entropy)
+        kl = -(loglik + entropy + log_prior)
 
         return kl, recon
 
