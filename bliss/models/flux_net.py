@@ -194,9 +194,10 @@ class FluxEstimator(pl.LightningModule):
         entropy = entropy.view(batchsize, -1).sum(1)
 
         # log prior
-        log_prior = -(alpha + 1) * torch.log(est_flux.clamp(min=1e-6))
-        log_prior = (log_prior * star_bool).view(batchsize, -1).sum(1)
-
+        # log_prior = -(alpha + 1) * torch.log(est_flux.clamp(min=1e-6))
+        # log_prior = (log_prior * star_bool).view(batchsize, -1).sum(1)
+        log_prior = 0.
+        
         # negative elbo
         kl = -(loglik + entropy + log_prior)
 
