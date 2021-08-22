@@ -49,11 +49,11 @@ class FluxEncoderNet(nn.Module):
 
         # convolutional layers
         self.conv_layers = nn.Sequential(
-            nn.Conv2d(self.n_bands, 6, 2, 2),
+            nn.Conv2d(self.n_bands, 6, 3, 2),
             nn.ReLU(),
-            nn.Conv2d(6, 16, 2, 2),
+            nn.Conv2d(6, 16, 3, 2),
             nn.ReLU(),
-            nn.Conv2d(16, 16, 2, 2),
+            nn.Conv2d(16, 16, 3, 2),
             nn.ReLU(),
             nn.Flatten(1),
         )
@@ -77,7 +77,7 @@ class FluxEncoderNet(nn.Module):
     def forward(self, images):
 
         batch_size = images.shape[0]
-
+        
         # tile the image
         image_ptiles = self._get_ptiles_from_images(images)
 
@@ -184,7 +184,7 @@ class FluxEstimator(pl.LightningModule):
         )
 
         # log likelihood
-        scale = torch.sqrt(recon.clamp(min=1.0))
+        scale = torch.sqrt(recon.clamp(min=1.0)) 
         norm = normal.Normal(loc=recon, scale=scale)
         loglik = norm.log_prob(batch["images"]).view(batchsize, -1).sum(1)
 
@@ -193,13 +193,8 @@ class FluxEstimator(pl.LightningModule):
         entropy = torch.log(est_flux_sd) * star_bool
         entropy = entropy.view(batchsize, -1).sum(1)
 
-        # log prior
-        # log_prior = -(alpha + 1) * torch.log(est_flux.clamp(min=1e-6))
-        # log_prior = (log_prior * star_bool).view(batchsize, -1).sum(1)
-        log_prior = 0.
-        
         # negative elbo
-        kl = -(loglik + entropy + log_prior)
+        kl = -(loglik + entropy)
 
         return kl, recon
 
@@ -221,8 +216,10 @@ class FluxEstimator(pl.LightningModule):
         out = self.enc(batch["images"])
 
         # get loss
-        kl_qp, _ = self.kl_qp_flux_loss(batch, out["samples"], out["sd"])
-        # kl_pq = self.kl_pq_flux_loss(batch, out["mean"], out["sd"])
+        # kl_qp, _ = self.kl_qp_flux_loss(batch, out["samples"], out["sd"])
+        kl_qp, _ = self.kl_qp_flux_loss(batch, 
+                                        out["mean"], 
+                                        out["sd"] * 0. + 1.0)
 
         return kl_qp.mean()
 
