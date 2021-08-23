@@ -113,7 +113,7 @@ class FluxEncoderNet(nn.Module):
         indx1 = 2 * indx0
 
         mean = h[:, 0:indx0]
-        sd = F.softplus(h[:, indx0:indx1]) + 1e-6
+        sd = F.softplus(h[:, indx0:indx1]) 
 
         return mean, sd
 
@@ -198,30 +198,13 @@ class FluxEstimator(pl.LightningModule):
 
         return kl, recon
 
-    def kl_pq_flux_loss(self, batch, est_flux, est_flux_sd):
-
-        batchsize = batch["fluxes"].shape[0]
-
-        truth = batch["fluxes"]
-        star_bool = get_star_bool(batch["n_sources"], batch["galaxy_bool"])
-
-        # log likelihood
-        scale = est_flux_sd.clamp(min=1.0)
-        norm = normal.Normal(loc=est_flux, scale=scale)
-        kl = -(norm.log_prob(batch["fluxes"]) * star_bool).view(batchsize, -1).sum(1)
-
-        return kl
-
     def get_loss(self, batch):
         out = self.enc(batch["images"])
 
         # get loss
-        # kl_qp, _ = self.kl_qp_flux_loss(batch, out["samples"], out["sd"])
-        kl_qp, _ = self.kl_qp_flux_loss(batch, 
-                                        out["mean"], 
-                                        out["sd"] * 0. + 1.0)
+        kl_loss, _ = self.kl_qp_flux_loss(batch, out["samples"], out["sd"])
 
-        return kl_qp.mean()
+        return kl_loss.mean()
 
     # ---------------
     # Optimizer

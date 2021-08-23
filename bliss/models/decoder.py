@@ -282,9 +282,9 @@ class ImageDecoder(pl.LightningModule):
         assert n_stars.shape[0] == batch_size
 
         shape = (batch_size, self.n_tiles_per_image, self.max_sources, 1)
-        # base_fluxes = self._draw_pareto_maxed(shape)
-        flux_range = self.f_max - self.f_min
-        base_fluxes = torch.rand(*shape, device=self.device) * flux_range + self.f_min
+        base_fluxes = self._draw_pareto_maxed(shape)
+#         flux_range = self.f_max - self.f_min
+#         base_fluxes = torch.rand(*shape, device=self.device) * flux_range + self.f_min
 
         if self.n_bands > 1:
             shape = (
