@@ -71,6 +71,8 @@ class FluxEncoderNet(nn.Module):
             nn.ReLU(),
             nn.Linear(latent_dim, latent_dim),
             nn.ReLU(),
+            nn.Linear(latent_dim, latent_dim),
+            nn.ReLU(),
             nn.Linear(latent_dim, outdim),
         )
 
@@ -114,7 +116,9 @@ class FluxEncoderNet(nn.Module):
 
         mean = h[:, 0:indx0]
         sd = F.softplus(h[:, indx0:indx1]) 
-
+        
+        print(sd.min())
+        
         return mean, sd
 
     def _trim_ptiles(self, image_ptiles):
