@@ -115,7 +115,7 @@ class FluxEncoderNet(nn.Module):
         indx1 = 2 * indx0
 
         mean = h[:, 0:indx0]
-        sd = F.softplus(h[:, indx0:indx1]) 
+        sd = F.softplus(h[:, indx0:indx1]) * 1e-1
         
         print(sd.min())
         
