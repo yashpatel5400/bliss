@@ -79,7 +79,7 @@ class FluxEncoderNet(nn.Module):
     def forward(self, images):
 
         batch_size = images.shape[0]
-        
+
         # tile the image
         image_ptiles = self._get_ptiles_from_images(images)
 
@@ -116,7 +116,7 @@ class FluxEncoderNet(nn.Module):
 
         mean = h[:, 0:indx0]
         sd = F.softplus(h[:, indx0:indx1]) * 1e-1
-                
+
         return mean, sd
 
     def _trim_ptiles(self, image_ptiles):
@@ -186,7 +186,7 @@ class FluxEstimator(pl.LightningModule):
         )
 
         # log likelihood
-        scale = torch.sqrt(recon.clamp(min=1.0)) 
+        scale = torch.sqrt(recon.clamp(min=1.0))
         norm = normal.Normal(loc=recon, scale=scale)
         loglik = norm.log_prob(batch["images"]).view(batchsize, -1).sum(1)
 
@@ -197,10 +197,10 @@ class FluxEstimator(pl.LightningModule):
 
         # negative elbo
         kl = -(loglik + entropy)
-        
+
         # weight loss by the number of stars appearing in the image
         kl *= star_bool.view(batchsize, -1).sum(1) / star_bool.sum()
-        
+
         return kl, recon
 
     def get_loss(self, batch):
