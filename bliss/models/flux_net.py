@@ -116,9 +116,7 @@ class FluxEncoderNet(nn.Module):
 
         mean = h[:, 0:indx0]
         sd = F.softplus(h[:, indx0:indx1]) * 1e-1
-        
-        print(sd.min())
-        
+                
         return mean, sd
 
     def _trim_ptiles(self, image_ptiles):
@@ -199,7 +197,10 @@ class FluxEstimator(pl.LightningModule):
 
         # negative elbo
         kl = -(loglik + entropy)
-
+        
+        # weight loss by the number of stars appearing in the image
+        kl *= star_bool.view(batchsize, -1).sum(1) / star_bool.sum()
+        
         return kl, recon
 
     def get_loss(self, batch):
@@ -208,7 +209,7 @@ class FluxEstimator(pl.LightningModule):
         # get loss
         kl_loss, _ = self.kl_qp_flux_loss(batch, out["samples"], out["sd"])
 
-        return kl_loss.mean()
+        return kl_loss.sum()
 
     # ---------------
     # Optimizer
