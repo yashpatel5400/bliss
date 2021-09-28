@@ -16,20 +16,29 @@ plt.ioff()
 
 
 class CenteredGalaxyEncoder(nn.Module):
-    def __init__(self, slen=53, latent_dim=8, n_bands=1, hidden=32):
+    def __init__(self, slen=53, n_bands=1, hidden=(16, 8)):
 
         super().__init__()
 
         self.slen = slen
-        self.latent_dim = latent_dim
+        self.latent_dim = hidden[-1]
 
         kernels = [3, 3, 3, 3, 1]
         layers = []
+        slen_current = slen
         for (i, kernel_size) in enumerate(kernels):
             layer = ResidualConvBlock(n_bands * (2 ** i), 8, kernel_size, 4, mode="downsample")
             layers.append(layer)
+            slen_current = math.floor((slen_current - kernel_size) / 2 + 1)
             if i < len(kernels) - 1:
                 layers.append(nn.LeakyReLU())
+        if len(hidden) > 0:
+            layers.append(nn.Flatten())
+            h_prev = (slen_current ** 2) * (2 ** len(kernels))
+            for h in hidden:
+                layers.append(nn.Linear(h_prev, h))
+                layers.append(nn.LeakyReLU())
+                h_prev = h
         self.features = nn.Sequential(*layers)
 
     def forward(self, image):
@@ -38,13 +47,13 @@ class CenteredGalaxyEncoder(nn.Module):
 
 
 class CenteredGalaxyDecoder(nn.Module):
-    def __init__(self, slen=53, latent_dim=8, n_bands=1, hidden=32):
+    def __init__(self, slen=53, n_bands=1, hidden=(16, 8)):
         super().__init__()
 
         self.slen = slen
 
         kernels = [3, 3, 3, 3, 1]
-        layers = []
+        conv_layers = []
         slen_current = slen
         for (i, kernel_size) in enumerate(kernels):
             output_padding = (slen_current - kernel_size) % 2 if (slen_current != 2) else 0
@@ -56,11 +65,22 @@ class CenteredGalaxyDecoder(nn.Module):
                 mode="upsample",
                 output_padding=output_padding,
             )
-            layers.append(layer)
             if i < len(kernels) - 1:
-                layers.append(nn.LeakyReLU())
+                conv_layers.append(nn.LeakyReLU())
+            conv_layers.append(layer)
             slen_current = math.floor((slen_current - kernel_size) / 2 + 1)
-        self.features = nn.Sequential(*layers[::-1])
+        fc_layers = []
+
+        if len(hidden) > 0:
+            fc_layers.append(
+                nn.Unflatten(-1, torch.Size((2 ** len(kernels), slen_current, slen_current)))
+            )
+            h_next = (slen_current ** 2) * (2 ** len(kernels))
+            for h in hidden:
+                fc_layers.append(nn.LeakyReLU())
+                fc_layers.append(nn.Linear(h, h_next))
+                h_next = h
+        self.features = nn.Sequential(*fc_layers[::-1], *conv_layers[::-1])
 
     def forward(self, z):
         """Decodes image from latent representation."""
@@ -87,12 +107,12 @@ class OneCenteredGalaxyAE(pl.LightningModule):
         self.save_hyperparameters()
 
         self.main_autoencoder = nn.Sequential(
-            CenteredGalaxyEncoder(slen=slen, latent_dim=latent_dim, hidden=hidden, n_bands=n_bands),
-            CenteredGalaxyDecoder(slen=slen, latent_dim=latent_dim, hidden=hidden, n_bands=n_bands),
+            CenteredGalaxyEncoder(slen=slen, n_bands=n_bands),
+            CenteredGalaxyDecoder(slen=slen, n_bands=n_bands),
         )
         self.residual_autoencoder = nn.Sequential(
-            CenteredGalaxyEncoder(slen=slen, latent_dim=latent_dim, hidden=hidden, n_bands=n_bands),
-            CenteredGalaxyDecoder(slen=slen, latent_dim=latent_dim, hidden=hidden, n_bands=n_bands),
+            CenteredGalaxyEncoder(slen=slen, n_bands=n_bands),
+            CenteredGalaxyDecoder(slen=slen, n_bands=n_bands),
         )
         self.mse_residual_model_loss = mse_residual_model_loss
 
@@ -342,6 +362,7 @@ class ResConv2dBlock(Conv2d):
         y = super().forward(input)
         y = F.relu(y)
         return input + y
+
 
 class ResidualConvBlock(nn.Module):
     def __init__(
