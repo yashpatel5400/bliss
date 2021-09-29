@@ -16,7 +16,7 @@ plt.ioff()
 
 
 class CenteredGalaxyEncoder(nn.Module):
-    def __init__(self, slen=53, n_bands=1, hidden=(16, 8)):
+    def __init__(self, slen=53, n_bands=1, hidden=(256, 64, 16, 8)):
 
         super().__init__()
 
@@ -34,11 +34,13 @@ class CenteredGalaxyEncoder(nn.Module):
                 layers.append(nn.LeakyReLU())
         if len(hidden) > 0:
             layers.append(nn.Flatten())
+            layers.append(nn.LeakyReLU())
             h_prev = (slen_current ** 2) * (2 ** len(kernels))
-            for h in hidden:
+            for (i, h) in enumerate(hidden):
                 layers.append(nn.Linear(h_prev, h))
-                layers.append(nn.LeakyReLU())
                 h_prev = h
+                if i < len(hidden) - 1:
+                    layers.append(nn.LeakyReLU())
         self.features = nn.Sequential(*layers)
 
     def forward(self, image):
@@ -47,7 +49,7 @@ class CenteredGalaxyEncoder(nn.Module):
 
 
 class CenteredGalaxyDecoder(nn.Module):
-    def __init__(self, slen=53, n_bands=1, hidden=(16, 8)):
+    def __init__(self, slen=53, n_bands=1, hidden=(256, 64, 16, 8)):
         super().__init__()
 
         self.slen = slen
@@ -72,6 +74,7 @@ class CenteredGalaxyDecoder(nn.Module):
         fc_layers = []
 
         if len(hidden) > 0:
+            fc_layers.append(nn.LeakyReLU())
             fc_layers.append(
                 nn.Unflatten(-1, torch.Size((2 ** len(kernels), slen_current, slen_current)))
             )
@@ -172,7 +175,7 @@ class OneCenteredGalaxyAE(pl.LightningModule):
             optimizer.step(closure=optimizer_closure)
 
         if optimizer_idx == 1:
-            if self.trainer.global_step > 500:
+            if self.trainer.global_step > 7000:
                 optimizer.step(closure=optimizer_closure)
 
     # ---------------
