@@ -401,6 +401,7 @@ class GalsimBlends(SingleGalsimGalaxies):
             "blendedness": blendedness,
             "n_sources": torch.tensor([n_sources]),
             "plocs": plocs,
+            "slen": slen,
         }
 
     def _sample_distance_from_center(self) -> Tensor:
