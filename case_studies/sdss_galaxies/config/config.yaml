@@ -57,7 +57,7 @@ datasets:
         batch_size: 64
         n_batches: 10
     galsim_blended_galaxies:
-        _target_: bliss.datasets.galsim_galaxies.GalsimBlend
+        _target_: bliss.datasets.galsim_galaxies.GalsimBlends
         prior: ${datasets.sdss_galaxies.prior}
         decoder:
             _target_: bliss.datasets.galsim_galaxies.GalsimGalaxyDecoder

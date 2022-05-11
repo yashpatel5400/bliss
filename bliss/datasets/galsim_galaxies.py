@@ -327,7 +327,7 @@ class SingleGalsimGalaxies(pl.LightningDataModule, Dataset):
         return DataLoader(self, batch_size=self.batch_size, num_workers=self.num_workers)
 
 
-class GalsimBlend(SingleGalsimGalaxies):
+class GalsimBlends(SingleGalsimGalaxies):
     """Blend where one galaxy is always centered."""
 
     def __init__(
