@@ -12,22 +12,22 @@ hydra:
 
 mode: train
 
-gpus: 4 # use a single gpu by default.
+gpus: 1 # use a single gpu by default.
 
 paths:
     root: ${oc.env:BLISS_HOME}
     sdss: ${paths.root}/data/sdss
     data: ${paths.root}/data
-    project: ${paths.root}/case_studies/strong_lensing
+    project: ${paths.root}/case_studies/substructure
     output: ${paths.project}/output
 
 datasets:
     simulated:
         _target_: bliss.datasets.simulated.SimulatedDataset
-        decoder: ${models.decoder}
+        decoder: ${models.lens_decoder}
         prior: ${models.prior}
-        n_tiles_h: 1
-        n_tiles_w: 1
+        n_tiles_h: 20
+        n_tiles_w: 20
         background:
             _target_: bliss.datasets.background.SimulatedSDSSBackground
             sdss_dir: ${paths.sdss}
@@ -40,14 +40,24 @@ datasets:
         batch_size: 32
         generate_device: "cuda:0"
         testing_file: null
-
+        
 models:
+    lens_decoder:
+        _target_: bliss.models.galsim_decoder.LenstronomySingleLensedGalaxyDecoder
+        n_bands: 1
+        slen: 4
+        pixel_scale: 0.396
+        psf_params_file: ${paths.data}/sdss/5313/3/117/psField-005313-3-0117.fits
+        psf_slen: 25
+        sdss_bands:
+            - 2
+        generate_residual: True
     decoder:
         _target_: bliss.models.decoder.ImageDecoder
         n_bands: 1
         tile_slen: 4
         ptile_slen: 100
-        border_padding: 24
+        border_padding: 48
         psf_params_file: ${paths.data}/sdss/5313/3/117/psField-005313-3-0117.fits
         galaxy_model:
             _target_: bliss.models.galsim_decoder.SingleGalsimGalaxyDecoder
@@ -70,49 +80,13 @@ models:
         psf_slen: 25
         sdss_bands:
             - 2
-    lensing_binary:
-        _target_: bliss.models.lensing_binary_encoder.LensingBinaryEncoder
-        input_transform:
-            _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
-        n_bands: ${models.decoder.n_bands}
-        tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
-        channel: 8
-        hidden: 128
-        spatial_dropout: 0.0
-        dropout: 0.0
-    binary:
-        _target_: bliss.models.binary.BinaryEncoder
-        input_transform:
-            _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
-        n_bands: ${models.decoder.n_bands}
-        tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
-        channel: 8
-        hidden: 128
-        spatial_dropout: 0.0
-        dropout: 0.0
-    detection_encoder:
-        _target_: bliss.models.detection_encoder.DetectionEncoder
-        input_transform:
-            _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
-        n_bands: ${models.decoder.n_bands}
-        tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
-        max_detections: ${models.prior.max_sources}
-        channel: 8
-        spatial_dropout: 0.0
-        dropout: 0.0
-        hidden: 128
-        annotate_probs: True
-        slack: 1.0
     galaxy_encoder:
         _target_: bliss.models.galsim_encoder.GalsimEncoder
         input_transform:
             _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
         n_bands: ${models.decoder.n_bands}
         tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
+        ptile_slen: 52
         hidden: 128
         channel: 8
         spatial_dropout: 0.0
@@ -123,28 +97,20 @@ models:
             _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
         n_bands: ${models.decoder.n_bands}
         tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
+        ptile_slen: ${models.lens_decoder.slen}
         hidden: 128
         channel: 8
         spatial_dropout: 0.0
         dropout: 0.0
-    galaxy_net:
-        _target_: bliss.models.galaxy_net.OneCenteredGalaxyAE
-        slen: 53
-        latent_dim: 8
-        hidden: 256
-        n_bands: 1
     prior:
-        _target_: bliss.models.prior.ImagePrior
+        _target_: bliss.models.prior.SubstructurePrior
         n_bands: 1
-        max_sources: 1
-        mean_sources: 0.03
-        min_sources: 1
+        max_subhalos: 1
+        mean_subhalos: 0.03
+        min_subhalos: 0
         f_min: 1e3
         f_max: 1e6
         alpha: 0.5
-        prob_galaxy: 1.0
-        prob_lensed_galaxy: 1.0
         galaxy_prior:
             _target_: bliss.models.galsim_decoder.SingleGalsimGalaxyPrior
             flux_sample: "pareto"

@@ -21,15 +21,11 @@ from case_studies.sdss_galaxies.plots.sim_blend_metrics import BlendSimFigures
 
 def load_models(cfg, device):
     # placeholder encoders to be removed
-    location = instantiate(cfg.models.detection_encoder).to(device).eval()
-    binary = instantiate(cfg.models.binary).to(device).eval()
-    lensing_binary = instantiate(cfg.models.lensing_binary).to(device).eval()
-
     galaxy = instantiate(cfg.models.galaxy_encoder).to(device).eval()
-    # galaxy.load_state_dict(torch.load(cfg.plots.galaxy_checkpoint, map_location=galaxy.device))
+    galaxy.load_state_dict(torch.load(cfg.plots.galaxy_checkpoint, map_location=galaxy.device))
 
     lens = instantiate(cfg.models.lens_encoder).to(device).eval()
-    # lens.load_state_dict(torch.load(cfg.plots.lens_checkpoint, map_location=lens.device))
+    lens.load_state_dict(torch.load(cfg.plots.lens_checkpoint, map_location=lens.device))
 
     n_images_per_batch = cfg.plots.encoder.n_images_per_batch
     n_rows_per_batch = cfg.plots.encoder.n_rows_per_batch

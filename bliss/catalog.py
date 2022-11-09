@@ -41,6 +41,8 @@ class TileCatalog(UserDict):
         "lensed_galaxy_bools",
         "lensed_galaxy_probs",
         "lens_params",
+        "subhalo_params",
+        "main_deflector_params",
     }
 
     def __init__(self, tile_slen: int, d: Dict[str, Tensor]):

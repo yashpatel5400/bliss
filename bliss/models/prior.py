@@ -84,6 +84,7 @@ class ImagePrior(pl.LightningModule):
         min_sources: int,
         max_sources: int,
         mean_sources: int,
+        centered_sources: bool,
         f_min: float,
         f_max: float,
         alpha: float,
@@ -113,6 +114,7 @@ class ImagePrior(pl.LightningModule):
         self.min_sources = min_sources
         self.max_sources = max_sources
         self.mean_sources = mean_sources
+        self.centered_sources = centered_sources
         self.f_min = f_min
         self.f_max = f_max
         self.alpha = alpha
@@ -148,7 +150,7 @@ class ImagePrior(pl.LightningModule):
         assert n_tiles_w > 0
         n_sources = self._sample_n_sources(batch_size, n_tiles_h, n_tiles_w)
         is_on_array = get_is_on_from_n_sources(n_sources, self.max_sources)
-        locs = self._sample_locs(is_on_array)
+        locs = self._sample_locs(is_on_array, centered_sources=self.centered_sources)
 
         galaxy_bools, star_bools = self._sample_n_galaxies_and_stars(is_on_array)
         lensed_galaxy_bools = self._sample_n_lenses(is_on_array, galaxy_bools)
@@ -198,13 +200,15 @@ class ImagePrior(pl.LightningModule):
         n_sources = n_sources.clamp(max=self.max_sources, min=self.min_sources)
         return rearrange(n_sources.long(), "b nth ntw 1 -> b nth ntw")
 
-    def _sample_locs(self, is_on_array):
+    def _sample_locs(self, is_on_array, centered_sources=False):
         # output dimension is batch_size x n_tiles_h x n_tiles_w x max_sources x 2
 
         # 2 = (x,y)
         batch_size, n_tiles_h, n_tiles_w, max_sources = is_on_array.shape
         shape = (batch_size, n_tiles_h, n_tiles_w, max_sources, 2)
         locs = torch.rand(*shape, device=is_on_array.device)
+        if centered_sources:
+            locs *= 0
         locs *= is_on_array.unsqueeze(-1)
 
         return locs
@@ -329,8 +333,8 @@ class ImagePrior(pl.LightningModule):
             base_qs = self._sample_param_from_dist(base_shape, 1, torch.rand, device)
             base_betas = self._sample_param_from_dist(base_shape, 1, torch.rand, device)
 
-            lens_params[..., 0:1] = base_radii * 25.0 + 5.0
-            lens_params[..., 1:3] = base_centers * 1.0
+            lens_params[..., 0:1] = base_radii * 5.0 + 5.0
+            lens_params[..., 1:3] = base_centers * 0.25
 
             # ellipticities must satisfy some angle relationships
             beta_radians = (base_betas - 0.5) * (np.pi / 2)  # [-pi / 4, pi / 4]
@@ -338,3 +342,173 @@ class ImagePrior(pl.LightningModule):
             lens_params[..., 3:4] = ell_factors * torch.cos(beta_radians)
             lens_params[..., 4:5] = ell_factors * torch.sin(beta_radians)
         return lens_params * lensed_galaxy_bools
+
+class SubstructurePrior(pl.LightningModule):
+    """Prior distribution of objects in a substructure analysis image."""
+
+    def __init__(
+        self,
+        n_bands: int,
+        min_subhalos: int,
+        max_subhalos: int,
+        mean_subhalos: int,
+        f_min: float,
+        f_max: float,
+        alpha: float,
+        galaxy_prior: Optional[GalaxyPrior] = None,
+        lensed_galaxy_prior: Optional[GalaxyPrior] = None,
+    ):
+        """Initializes ImagePrior.
+
+        Args:
+            n_bands: Number of bands (colors) in the image.
+            min_subhalos: Minimum number of subhalos in a tile
+            max_subhalos: Maximum number of subhalos in a tile
+            mean_subhalos: Mean rate of subhalos appearing in a tile
+            f_min: Prior parameter on fluxes
+            f_max: Prior parameter on fluxes
+            alpha: Prior parameter on fluxes (pareto parameter)
+            prob_lensed_galaxy: Prior probability a galaxy is lensed
+            prob_galaxy: Prior probability a source is a galaxy
+            galaxy_prior: Object from which galaxy latents are sampled
+            lensed_galaxy_prior: Object from which lens galaxy latents are sampled
+        """
+        super().__init__()
+        self.n_bands = n_bands
+
+        self.min_subhalos = min_subhalos
+        self.max_subhalos = max_subhalos
+        self.mean_subhalos = mean_subhalos
+        
+        self.f_min = f_min
+        self.f_max = f_max
+        self.alpha = alpha
+
+        self.galaxy_prior = galaxy_prior
+        assert self.galaxy_prior is not None
+
+        self.lensed_galaxy_prior = lensed_galaxy_prior
+        assert self.lensed_galaxy_prior is not None
+
+    def sample_prior(
+        self, tile_slen: int, batch_size: int, n_tiles_h: int, n_tiles_w: int
+    ) -> TileCatalog:
+        """Samples global latent variable (i.e. main deflector and source) and tiled subhalos.
+
+        Args:
+            tile_slen: Side length of catalog tiles.
+            batch_size: The number of samples to draw.
+            n_tiles_h: Number of tiles height-wise.
+            n_tiles_w: Number of tiles width-wise.
+
+        Returns:
+            A dictionary of tensors. Each tensor is a particular per-tile quantity; i.e.
+            the first three dimensions of each tensor are
+            `(batch_size, self.n_tiles_h, self.n_tiles_w)`.
+            The remaining dimensions are variable-specific.
+        """
+        slen = tile_slen * n_tiles_h
+
+        # assume one source and main deflector and both centered
+        single_tile_single_src_shape = (batch_size, 1, 1, 1)
+        global_n_sources = torch.ones((batch_size, 1, 1), device=self.device)
+        global_locs = torch.ones(single_tile_single_src_shape + (2,), device=self.device) * 0.5
+
+        src_light_params = self.galaxy_prior.sample(batch_size, self.device)
+        main_deflector_light_params = self.lensed_galaxy_prior.sample(batch_size, self.device)
+        main_deflector_lens_params = self._sample_lens_params(batch_size, slen)
+
+        galaxy_bools = torch.ones(single_tile_single_src_shape + (1,), device=self.device)
+        galaxy_params = src_light_params.reshape(single_tile_single_src_shape + (-1,)) # batch x (1 x 1 <- single tile) x 1 (single global source) x params
+        
+        lensed_galaxy_bools = torch.ones(single_tile_single_src_shape + (1,), device=self.device)
+        lens_params = torch.cat((main_deflector_light_params, main_deflector_lens_params), dim=-1)
+        lens_params = lens_params.reshape(single_tile_single_src_shape + (-1,)) # batch x (1 x 1 <- single tile) x 1 (single global source) x params
+            
+        global_catalog = {
+            "n_sources": global_n_sources,
+            "locs": global_locs,
+            "galaxy_bools": galaxy_bools,
+            "galaxy_params": galaxy_params,
+            "lensed_galaxy_bools": lensed_galaxy_bools,
+            "lens_params": lens_params,
+        }
+        
+        assert n_tiles_h > 0
+        assert n_tiles_w > 0
+        n_subhalos = self._sample_n_subhalos(batch_size, n_tiles_h, n_tiles_w)
+        n_subhalos[:,:4,:] = 0
+        n_subhalos[:,-4:,:] = 0
+        n_subhalos[:,:,:4] = 0
+        n_subhalos[:,:,-4:] = 0
+
+        is_on_array = get_is_on_from_n_sources(n_subhalos, self.max_subhalos)
+        subhalo_locs = self._sample_subhalo_locs(is_on_array)
+        subhalo_params = self._sample_subhalo_params(is_on_array)
+
+        subhalo_catalog = {
+            "n_sources": n_subhalos,
+            "locs": subhalo_locs,
+            "subhalo_params": subhalo_params,
+        }
+        return {
+            "subhalos": TileCatalog(tile_slen, subhalo_catalog),
+            "global": TileCatalog(slen, global_catalog),
+        }
+
+    def _sample_n_subhalos(self, batch_size, n_tiles_h, n_tiles_w):
+        # returns number of subhalos for each batch x tile
+        # output dimension is batch_size x n_tiles_h x n_tiles_w
+
+        # always poisson distributed.
+        p = torch.full((1,), self.mean_subhalos, device=self.device, dtype=torch.float)
+        m = Poisson(p)
+        n_subhalos = m.sample([batch_size, n_tiles_h, n_tiles_w])
+
+        # long() here is necessary because used for indexing and one_hot encoding.
+        n_subhalos = n_subhalos.clamp(max=self.max_subhalos, min=self.min_subhalos)
+        return rearrange(n_subhalos.long(), "b nth ntw 1 -> b nth ntw")
+
+    def _sample_subhalo_locs(self, is_on_array):
+        # output dimension is batch_size x n_tiles_h x n_tiles_w x max_subhalos x 2
+
+        # 2 = (x,y)
+        batch_size, n_tiles_h, n_tiles_w, max_subhalos = is_on_array.shape
+        shape = (batch_size, n_tiles_h, n_tiles_w, max_subhalos, 2)
+        locs = torch.rand(*shape, device=is_on_array.device)
+        locs *= is_on_array.unsqueeze(-1)
+
+        return locs
+
+    def _sample_lens_params(self, batch_size, slen):
+        """Sample latent galaxy params from GalaxyPrior object."""
+        # latents are: theta_E, center_x/y, e_1/2
+        sample_params_from_dist = lambda dist, n : dist(batch_size, n)
+        base_radii = sample_params_from_dist(torch.rand, 1)
+        base_centers = sample_params_from_dist(torch.randn, 2)
+
+        lens_params = torch.zeros((batch_size, 5))
+        lens_params[:, 0:1] = base_radii * 15.0 + 10.0
+        lens_params[:, 1:3] = slen // 2
+
+        # ellipticities must satisfy some angle relationships
+        base_qs = sample_params_from_dist(torch.rand, 1) * 0.0 + 1.0
+        base_betas = sample_params_from_dist(torch.rand, 1)
+        beta_radians = (base_betas - 0.5) * 0 # TODO: assume aligned for now (get working on simple case)
+        ell_factors = (1 - base_qs) / (1 + base_qs)
+        lens_params[:, 3:4] = ell_factors * torch.cos(beta_radians)
+        lens_params[:, 4:5] = ell_factors * torch.sin(beta_radians)
+        return lens_params.to(self.device)
+
+    def _sample_subhalo_params(self, is_on_array):
+        batch_size, n_tiles_h, n_tiles_w, max_subhalos = is_on_array.shape
+
+        # the parameterization of the NFW profiles are:
+        # - Rs (radius of the scale parameter Rs in units of angles)
+        # - theta_Rs (radial deflection angle at Rs)
+        # - center_x, center_y, (position of the centre of the profile in angular units)
+        param_shape = (batch_size, n_tiles_h, n_tiles_w, max_subhalos, 1)
+        sample_params_from_dist = lambda dist : dist(param_shape)
+        Rs_list = sample_params_from_dist(torch.rand) * 1.0 + 0.5
+        theta_Rs_list = sample_params_from_dist(torch.rand) * 1.0 + 0.5
+        return torch.cat((Rs_list, theta_Rs_list), dim=-1).to(self.device)

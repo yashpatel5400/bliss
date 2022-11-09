@@ -1,13 +1,38 @@
 from typing import Dict, Optional, Tuple
 
+import copy
+import cv2
 import galsim
 import numpy as np
 import torch
 from torch import Tensor
 
+import matplotlib.pyplot as plt
+
 from bliss.catalog import FullCatalog, TileCatalog
 from bliss.models.psf_decoder import PSFDecoder
 
+# lenstronomy utility functions
+import lenstronomy.Util.util as util
+import lenstronomy.Util.image_util as image_util
+
+# lenstronomy imports
+from lenstronomy.LensModel.lens_model import LensModel
+from lenstronomy.LensModel.Solver.lens_equation_solver import LensEquationSolver
+from lenstronomy.LightModel.light_model import LightModel
+from lenstronomy.PointSource.point_source import PointSource
+from lenstronomy.ImSim.image_model import ImageModel
+import lenstronomy.Util.param_util as param_util
+import lenstronomy.Util.simulation_util as sim_util
+import lenstronomy.Util.image_util as image_util
+from lenstronomy.Util import kernel_util
+import lenstronomy.Util.util as util
+from lenstronomy.Data.imaging_data import ImageData
+from lenstronomy.Data.psf import PSF
+from lenstronomy.ImSim.image_model import ImageModel
+from lenstronomy.LightModel.Profiles.shapelets import ShapeletSet
+from lenstronomy.LightModel.Profiles.shapelets_polar import ShapeletSetPolar
+from lenstronomy.ImSim.image_linear_solve import ImageLinearFit
 
 class SingleGalsimGalaxyPrior:
     dim_latents = 7
@@ -321,6 +346,207 @@ class SingleLensedGalsimGalaxyDecoder(SingleGalsimGalaxyDecoder):
         lensed_src = self.lens_galsim(unlensed_src, pure_lens_params)
         return torch.from_numpy(lensed_src).reshape(1, slen, slen)
 
+class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
+    def __init__(
+        self,
+        slen: int,
+        n_bands: int,
+        pixel_scale: float,
+        psf_params_file: Optional[str] = None,
+        psf_slen: Optional[int] = None,
+        sdss_bands: Optional[Tuple[int, ...]] = None,
+        generate_residual: Optional[bool] = False,
+    ) -> None:
+        super().__init__(
+            psf_params_file=psf_params_file,
+            psf_slen=psf_slen,
+            sdss_bands=sdss_bands,
+            n_bands=n_bands,
+            pixel_scale=pixel_scale,
+        )
+        assert len(self.psf.shape) == 3 and self.psf.shape[0] == 1
+
+        assert n_bands == 1, "Only 1 band is supported"
+        self.tile_slen = slen
+        self.n_bands = 1
+        self.pixel_scale = pixel_scale
+        self.generate_residual = generate_residual
+
+    def gen_lenstronomy_src(self, src_params, src_x, src_y):
+        total_flux, disk_frac, beta_radians, disk_q, a_d, bulge_q, a_b = src_params
+        bulge_frac = 1 - disk_frac
+
+        disk_flux = total_flux * disk_frac
+        bulge_flux = total_flux * bulge_frac
+
+        source_model_list = []
+        kwargs_source = []
+        if disk_flux > 0:
+            b_d = a_d * disk_q
+            disk_hlr_arcsecs = np.sqrt(a_d * b_d)
+            ell_factor_disk = (1 - disk_q) / (1 + disk_q)
+            e1_disk = ell_factor_disk * np.cos(beta_radians)
+            e2_disk = ell_factor_disk * np.sin(beta_radians)
+            kwargs_disk_sersic_source = {
+                'amp': disk_flux, 
+                'R_sersic': disk_hlr_arcsecs, 
+                'n_sersic': 1, 
+                'e1': e1_disk, 'e2': e2_disk, 
+                'center_x': src_x, 'center_y': src_y}
+        
+            source_model_list.append("SERSIC_ELLIPSE")
+            kwargs_source.append(kwargs_disk_sersic_source)
+        if bulge_flux > 0:
+            b_b = bulge_q * a_b
+            bulge_hlr_arcsecs = np.sqrt(a_b * b_b)
+            ell_factor_bulge = (1 - bulge_q) / (1 + bulge_q)
+            e1_bulge = ell_factor_bulge * np.cos(beta_radians)
+            e2_bulge = ell_factor_bulge * np.sin(beta_radians)
+            kwargs_bulge_sersic_source = {
+                'amp': bulge_flux, 
+                'R_sersic': bulge_hlr_arcsecs, 
+                'n_sersic': 4, 
+                'e1': e1_bulge, 'e2': e2_bulge, 
+                'center_x': src_x, 'center_y': src_y}
+
+            source_model_list.append("SERSIC_ELLIPSE")
+            kwargs_source.append(kwargs_bulge_sersic_source)
+
+        return source_model_list, kwargs_source
+
+    def render_image(self, global_param: Tensor, subhalo_param: Tensor, slen):
+        global_param = global_param.cpu().numpy()[0] # assume only a single "main deflector"
+        subhalo_param = subhalo_param.cpu().numpy()
+        src_pos, src_light_params, lens_light_params, lens_sie_params = global_param[:2], global_param[2:9], global_param[9:16], global_param[16:]
+        src_x, src_y = src_pos
+        
+        # define data specifics
+        background_rms = .2  #  background noise per pixel
+        exp_time = 100.  #  exposure time (arbitrary units, flux per pixel is in units #photons/exp_time unit)
+        fwhm = 0.1 # full width half max of PSF
+        psf_type = 'GAUSSIAN'  # 'gaussian', 'pixel', 'NONE'
+        lenstronomy_pixel_scale = 1 # we use a 1-1 pixel scale arbitrarily to simplify the pipeline
+
+        kwargs_data = sim_util.data_configure_simple(slen, lenstronomy_pixel_scale, exp_time, background_rms)
+        data = ImageData(**kwargs_data)
+        psf = PSF(psf_type=psf_type, fwhm=fwhm, truncation=5)
+        
+        # lenstronomy rendering logic takes the center of the image to be (0, 0) so all the centers need to be shifted accordingly
+        lens_model_list = ['SIE']
+        theta_e, lens_x, lens_y, lens_e1, lens_e2 = lens_sie_params
+        lens_kwargs = [{
+            "theta_E": theta_e, 
+            "center_x": lens_x - (slen // 2), 
+            "center_y": lens_y - (slen // 2), 
+            "e1": lens_e1, 
+            "e2": lens_e2,
+        }]
+
+        main_lens_kwargs = copy.deepcopy(lens_kwargs)
+        main_lens_model = LensModel(lens_model_list)
+        
+        for subhalo in subhalo_param:
+            if np.any(subhalo):
+                subhalo_type = 'TNFW'
+                subhalo_x, subhalo_y, subhalo_R, subhalo_theta_R = subhalo
+                lens_model_list.append(subhalo_type)
+                lens_kwargs.append({
+                    'Rs': subhalo_R,
+                    'r_trunc': 5 * subhalo_R,
+                    'alpha_Rs': subhalo_theta_R, 
+                    'center_x': subhalo_x - (slen // 2), 
+                    'center_y': subhalo_y - (slen // 2),
+                })
+
+        lens_model = LensModel(lens_model_list)
+
+        # used for debugging potentials and prior setup
+        k_display_lens_potential = False
+        if k_display_lens_potential:
+            x_grid, y_grid = util.make_grid(numPix=slen, deltapix=1)
+            kappa = lens_model.kappa(x_grid, y_grid, lens_kwargs)
+            lens_potential = util.array2image(np.log10(kappa))
+
+            plt.imshow(np.log(lens_potential + 2.5))
+            plt.savefig("potential.png")
+            plt.clf()
+        
+        src_light_model_list, src_light_kwargs = self.gen_lenstronomy_src(src_light_params, src_x=src_x - (slen // 2), src_y=src_y - (slen // 2))
+        lens_light_model_list, lens_light_kwargs = self.gen_lenstronomy_src(lens_light_params, lens_x - (slen // 2), lens_y - (slen // 2))
+
+        src_light_model = LightModel(src_light_model_list)
+        lens_light_model = LightModel(lens_light_model_list)
+
+        kwargs_numerics = {'supersampling_factor': 8, 'supersampling_convolution': True}
+        lensed_model = ImageModel(data_class=data, psf_class=psf, kwargs_numerics=kwargs_numerics, lens_model_class=lens_model, source_model_class=src_light_model, lens_light_model_class=lens_light_model)
+        lensed_img = lensed_model.image(lens_kwargs, src_light_kwargs, kwargs_lens_light=lens_light_kwargs, kwargs_ps=None)
+
+        poisson = image_util.add_poisson(lensed_img, exp_time=exp_time)
+        bkg = image_util.add_background(lensed_img, sigma_bkd=background_rms)
+        lensed_full_noised = (lensed_img + poisson + bkg).astype(np.float32)
+
+        result = torch.from_numpy(lensed_full_noised).reshape(1, slen, slen)
+        
+        if self.generate_residual:
+            main_lensed_model = ImageModel(data_class=data, psf_class=psf, kwargs_numerics=kwargs_numerics, lens_model_class=main_lens_model, source_model_class=src_light_model, lens_light_model_class=lens_light_model)
+            main_lensed_img = main_lensed_model.image(main_lens_kwargs, src_light_kwargs, kwargs_lens_light=lens_light_kwargs, kwargs_ps=None)
+            
+            thresholded_lensed_img = (lensed_img > np.quantile(lensed_img, 0.95)).astype(int)
+            thresholded_main_lensed_img = (main_lensed_img > np.quantile(main_lensed_img, 0.95)).astype(int)
+            residuals = ((thresholded_lensed_img - thresholded_main_lensed_img) == 1).astype(np.uint8) * 255
+
+            connectivity = 8
+            num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(residuals, connectivity, cv2.CV_32S)
+            residual_mask = np.zeros(labels.shape, dtype=np.uint8)
+            for label in range(1, num_labels):
+                area = stats[label, cv2.CC_STAT_AREA]
+                area_thresh = 3
+                if area > area_thresh:
+                    residual_mask += (labels == label)
+            residual_mask = residual_mask.astype(bool)
+
+            residualized_result = np.zeros(lensed_full_noised.shape)
+            residualized_result[residual_mask] = lensed_full_noised[residual_mask]
+
+            k_display_residuals = False
+            if k_display_residuals:
+                f, axes = plt.subplots(1, 3, figsize=(12, 8), sharex=False, sharey=False)
+                axes[0].imshow(lensed_full_noised)
+                axes[1].imshow(main_lensed_img)
+                axes[2].imshow(residualized_result)
+                plt.savefig("residuals.png")
+
+            residuals = torch.from_numpy(residualized_result).reshape(1, slen, slen)
+        else:
+            residuals = torch.zeros_like(result)
+        return result, residuals
+
+    def render_images(self, mixed_catalog: TileCatalog) -> Tensor:
+        global_catalog = mixed_catalog["global"].to_full_params()
+        subhalo_catalog = mixed_catalog["subhalos"].to_full_params()
+        global_params = torch.cat((global_catalog.plocs, global_catalog["galaxy_params"], global_catalog["lens_params"]), axis=-1)
+        subhalo_params = torch.cat((subhalo_catalog.plocs, subhalo_catalog["subhalo_params"]), axis=-1)
+        assert subhalo_catalog.width == subhalo_catalog.height
+        return self(global_params, subhalo_params, subhalo_catalog.width)
+        
+    def __call__(self, global_params: Tensor, subhalo_params: Tensor, slen: int) -> Tensor:
+        if global_params.shape[0] == 0:
+            return torch.zeros(0, self.slen, self.slen, device=global_params.device)
+
+        batch_size = len(global_params)
+        images = []
+        residual_images = []
+        for i in range(batch_size):
+            image, residuals = self.render_image(global_params[i], subhalo_params[i], slen)
+            images.append(image)
+            residual_images.append(residuals)
+        
+        # names are a bit misleading: "global" is the full images, "subhalos" is the residuals, with this chosen
+        # just to ensure the two are the same for other parts of the code
+        return {
+            "global": torch.stack(images, dim=0).to(global_params.device),
+            "subhalos": torch.stack(residual_images, dim=0).to(global_params.device),
+        }
 
 class UniformGalsimPrior:
     def __init__(

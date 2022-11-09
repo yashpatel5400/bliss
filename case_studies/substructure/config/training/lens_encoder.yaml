@@ -7,3 +7,7 @@ n_epochs: 4001
 save_top_k: 5
 trainer:
   enable_checkpointing: True
+
+datasets:
+    simulated:
+        train_tag: "global"
