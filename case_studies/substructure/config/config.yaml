@@ -12,7 +12,7 @@ hydra:
 
 mode: train
 
-gpus: 4 # use a single gpu by default.
+gpus: 1 # use a single gpu by default.
 
 paths:
     root: ${oc.env:BLISS_HOME}
@@ -118,6 +118,17 @@ models:
         hidden: 128
         annotate_probs: True
         slack: 1.0
+    subhalo_encoder:
+        _target_: bliss.models.subhalo_encoder.SubhaloEncoder
+        input_transform:
+            _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
+        n_bands: ${models.subhalo_detection_encoder.n_bands} 
+        tile_slen: ${models.subhalo_detection_encoder.tile_slen}
+        ptile_slen: ${models.subhalo_detection_encoder.ptile_slen}
+        hidden: ${models.subhalo_detection_encoder.hidden}
+        channel: ${models.subhalo_detection_encoder.channel}
+        spatial_dropout: ${models.subhalo_detection_encoder.spatial_dropout}
+        dropout: ${models.subhalo_detection_encoder.dropout}
     prior:
         _target_: bliss.models.prior.SubstructurePrior
         n_bands: 1
