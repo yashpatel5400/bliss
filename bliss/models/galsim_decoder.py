@@ -447,6 +447,7 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
         
         for subhalo in subhalo_param:
             if np.any(subhalo):
+                offset = 4 * self.tile_slen # HACK: not sure the "correct" way of doing this, but this does the offsetting from padding
                 subhalo_type = 'TNFW'
                 subhalo_x, subhalo_y, subhalo_R, subhalo_theta_R = subhalo
                 lens_model_list.append(subhalo_type)
@@ -454,8 +455,8 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
                     'Rs': subhalo_R,
                     'r_trunc': 5 * subhalo_R,
                     'alpha_Rs': subhalo_theta_R, 
-                    'center_x': subhalo_x - (slen // 2), 
-                    'center_y': subhalo_y - (slen // 2),
+                    'center_x': offset + subhalo_x - (slen // 2), 
+                    'center_y': offset + subhalo_y - (slen // 2),
                 })
 
         lens_model = LensModel(lens_model_list)
@@ -500,7 +501,7 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
             residual_mask = np.zeros(labels.shape, dtype=np.uint8)
             for label in range(1, num_labels):
                 area = stats[label, cv2.CC_STAT_AREA]
-                area_thresh = 3
+                area_thresh = 1
                 if area > area_thresh:
                     residual_mask += (labels == label)
             residual_mask = residual_mask.astype(bool)
@@ -516,7 +517,7 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
                 axes[2].imshow(residualized_result)
                 plt.savefig("residuals.png")
 
-            residuals = torch.from_numpy(residualized_result).reshape(1, slen, slen)
+            residuals = torch.from_numpy(residualized_result).reshape(1, slen, slen).float()
         else:
             residuals = torch.zeros_like(result)
         return result, residuals
@@ -527,7 +528,7 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
         global_params = torch.cat((global_catalog.plocs, global_catalog["galaxy_params"], global_catalog["lens_params"]), axis=-1)
         subhalo_params = torch.cat((subhalo_catalog.plocs, subhalo_catalog["subhalo_params"]), axis=-1)
         assert subhalo_catalog.width == subhalo_catalog.height
-        return self(global_params, subhalo_params, subhalo_catalog.width)
+        return self(global_params, subhalo_params, global_catalog.width)
         
     def __call__(self, global_params: Tensor, subhalo_params: Tensor, slen: int) -> Tensor:
         if global_params.shape[0] == 0:

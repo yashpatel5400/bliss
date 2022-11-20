@@ -12,7 +12,7 @@ hydra:
 
 mode: train
 
-gpus: 1 # use a single gpu by default.
+gpus: 3 # use a single gpu by default.
 
 paths:
     root: ${oc.env:BLISS_HOME}
@@ -104,6 +104,20 @@ models:
         spatial_dropout: ${models.galaxy_encoder.spatial_dropout}
         dropout: ${models.galaxy_encoder.dropout}
         precentered: ${models.galaxy_encoder.precentered}
+    subhalo_detection_encoder:
+        _target_: bliss.models.detection_encoder.DetectionEncoder
+        input_transform:
+            _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
+        n_bands: ${models.decoder.n_bands}
+        tile_slen: ${models.decoder.tile_slen}
+        ptile_slen: 36
+        max_detections: 1
+        channel: 8
+        spatial_dropout: 0.0
+        dropout: 0.0
+        hidden: 128
+        annotate_probs: True
+        slack: 1.0
     prior:
         _target_: bliss.models.prior.SubstructurePrior
         n_bands: 1

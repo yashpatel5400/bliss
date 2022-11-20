@@ -434,21 +434,34 @@ class SubstructurePrior(pl.LightningModule):
             "lens_params": lens_params,
         }
         
+        # both to fit into the framework of padded tiles in the inference procedure and since subhalos
+        # can only be detected in regions around the main deflector, we pad the main tiles with empty tiles in the data
+        n_padding = 4
+        populated_tiles_h, populated_tiles_w = n_tiles_h - 2 * n_padding, n_tiles_w - 2 * n_padding
         assert n_tiles_h > 0
         assert n_tiles_w > 0
-        n_subhalos = self._sample_n_subhalos(batch_size, n_tiles_h, n_tiles_w)
-        n_subhalos[:,:4,:] = 0
-        n_subhalos[:,-4:,:] = 0
-        n_subhalos[:,:,:4] = 0
-        n_subhalos[:,:,-4:] = 0
+        n_subhalos = self._sample_n_subhalos(batch_size, populated_tiles_h, populated_tiles_w)
 
         is_on_array = get_is_on_from_n_sources(n_subhalos, self.max_subhalos)
         subhalo_locs = self._sample_subhalo_locs(is_on_array)
         subhalo_params = self._sample_subhalo_params(is_on_array)
 
+        # we fill in dummy values for star fluxes to directly leverage existing detection encoder
+        dummy_galaxy_bools = torch.ones(
+            batch_size,
+            populated_tiles_h,
+            populated_tiles_w,
+            1,
+            1,
+            device=is_on_array.device,
+        )
+
         subhalo_catalog = {
             "n_sources": n_subhalos,
             "locs": subhalo_locs,
+            "galaxy_bools": dummy_galaxy_bools,
+            "star_bools": 1 - dummy_galaxy_bools,
+            "star_log_fluxes": dummy_galaxy_bools,
             "subhalo_params": subhalo_params,
         }
         return {
