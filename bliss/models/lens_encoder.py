@@ -37,6 +37,7 @@ class LensEncoder(pl.LightningModule):
         dropout: float,
         optimizer_params: dict = None,
         checkpoint_path: Optional[str] = None,
+        precentered: Optional[bool] = False,
     ):
         super().__init__()
 
@@ -44,7 +45,11 @@ class LensEncoder(pl.LightningModule):
         self.n_bands = n_bands
         self.tile_slen = tile_slen
         self.ptile_slen = ptile_slen
-        self.slen = self.ptile_slen - 2 * self.tile_slen  # will always crop 2 * tile_slen
+        self.precentered = precentered
+        if self.precentered:
+            self.slen = self.ptile_slen
+        else:
+            self.slen = self.ptile_slen - 2 * self.tile_slen  # will always crop 2 * tile_slen
         self.optimizer_params = optimizer_params
 
         assert (ptile_slen - tile_slen) % 2 == 0
@@ -86,7 +91,10 @@ class LensEncoder(pl.LightningModule):
 
     def encode(self, image_ptiles: Tensor, tile_locs: Tensor) -> Tensor:
         n_samples, n_ptiles, max_sources, _ = tile_locs.shape
-        centered_ptiles = self._get_images_in_centered_tiles(image_ptiles, tile_locs)
+        if self.precentered:
+            centered_ptiles = image_ptiles.unsqueeze(1)
+        else:
+            centered_ptiles = self._get_images_in_centered_tiles(image_ptiles, tile_locs)
         assert centered_ptiles.shape[-1] == centered_ptiles.shape[-2] == self.slen
         x = rearrange(centered_ptiles, "ns np c h w -> (ns np) c h w")
         enc_conv_output = self.enc_conv(x)

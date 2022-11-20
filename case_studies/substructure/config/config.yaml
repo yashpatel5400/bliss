@@ -85,23 +85,25 @@ models:
         input_transform:
             _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
         n_bands: ${models.decoder.n_bands}
-        tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: 52
+        tile_slen: 80
+        ptile_slen: 80
         hidden: 128
         channel: 8
         spatial_dropout: 0.0
         dropout: 0.0
+        precentered: True
     lens_encoder:
         _target_: bliss.models.lens_encoder.LensEncoder
         input_transform:
             _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
-        n_bands: ${models.decoder.n_bands}
-        tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.lens_decoder.slen}
-        hidden: 128
-        channel: 8
-        spatial_dropout: 0.0
-        dropout: 0.0
+        n_bands: ${models.galaxy_encoder.n_bands} 
+        tile_slen: ${models.galaxy_encoder.tile_slen}
+        ptile_slen: ${models.galaxy_encoder.ptile_slen}
+        hidden: ${models.galaxy_encoder.hidden}
+        channel: ${models.galaxy_encoder.channel}
+        spatial_dropout: ${models.galaxy_encoder.spatial_dropout}
+        dropout: ${models.galaxy_encoder.dropout}
+        precentered: ${models.galaxy_encoder.precentered}
     prior:
         _target_: bliss.models.prior.SubstructurePrior
         n_bands: 1

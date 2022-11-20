@@ -346,10 +346,7 @@ class CenterPaddedTilesTransform(nn.Module):
     def forward(self, image_ptiles: Tensor, tile_locs: Tensor) -> Tensor:
         n_ptiles, _, _, ptile_slen_img = image_ptiles.shape
         n_samples, n_ptiles_locs, max_sources, _ = tile_locs.shape
-
-        print(image_ptiles.shape)
-        print(tile_locs.shape)
-
+        
         assert max_sources == 1
         assert ptile_slen_img == self.ptile_slen
         assert n_ptiles_locs == n_ptiles
