@@ -48,8 +48,9 @@ class ParamsEncoder(pl.LightningModule):
         channel: int,
         spatial_dropout: float,
         dropout: float,
-        param_supports = None,
-        params_filter_tag = None,
+        param_supports,
+        params_tag,
+        params_filter_tag,
         optimizer_params: dict = None,
         checkpoint_path: Optional[str] = None,
         precentered: Optional[bool] = False,
@@ -72,6 +73,7 @@ class ParamsEncoder(pl.LightningModule):
         self.border_padding = (ptile_slen - tile_slen) // 2
 
         self.param_supports = param_supports
+        self.params_tag = params_tag
         self.params_filter_tag = params_filter_tag
         
         # will be trained.
@@ -183,7 +185,7 @@ class ParamsEncoder(pl.LightningModule):
             params_filter = None
         loss = self.get_params_nll(
             params_filter,
-            batch["params"],
+            batch[self.params_tag],
             params_pred,
         )
 
@@ -191,32 +193,32 @@ class ParamsEncoder(pl.LightningModule):
             "loss": loss,
         }
 
-    def get_params_nll(self, params_filter, true_params, params):
-        assert true_params.shape[:-1] == params.shape[:-1]
+    def get_params_nll(self, params_filter, true_params, var_dist_params):
+        assert true_params.shape[:-1] == var_dist_params.shape[:-1]
         true_params = true_params.view(-1, true_params.shape[-1]).transpose(0, 1)
-        params = params.view(-1, params.shape[-1]).transpose(0, 1)
+        var_dist_params = var_dist_params.view(-1, var_dist_params.shape[-1]).transpose(0, 1)
         
-        if params_filter:
+        if params_filter is not None:
+            params_filter = params_filter.view(-1)
             true_params = true_params[:, params_filter > 0]
-            params = params[:, params_filter > 0]
+            var_dist_params = var_dist_params[:, params_filter > 0]
 
         # compute log-likelihoods of parameters and negate at end for NLL loss
         log_prob = torch.zeros(1, requires_grad=True).to(device=true_params.device)
         for i, param_support in enumerate(self.param_supports):
-            param_support = param_support
             param_support_type = get_support_type(param_support)
-            transformed_param_mean = params[2 * i]
-            transformed_param_logvar = params[2 * i + 1]
+            transformed_param_mean = var_dist_params[2 * i]
+            transformed_param_logvar = var_dist_params[2 * i + 1]
             transformed_param_sd = (transformed_param_logvar.exp() + 1e-5).sqrt()
 
-            param = params[i]
+            param = true_params[i]
             if param_support_type == IntervalType.OPEN:
                 transformed_param = param
             elif param_support_type == IntervalType.HALFOPEN:
                 transformed_param = torch.log(param - param_support[0])
             elif param_support_type == IntervalType.CLOSED:
                 transformed_param = torch.logit((param - param_support[0]) / (param_support[1] - param_support[0]))
-
+            
             parameterized_dist = Normal(transformed_param_mean, transformed_param_sd)
             log_prob += parameterized_dist.log_prob(transformed_param).mean()
 
