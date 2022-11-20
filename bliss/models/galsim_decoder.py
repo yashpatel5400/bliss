@@ -478,15 +478,10 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
         src_light_model = LightModel(src_light_model_list)
         lens_light_model = LightModel(lens_light_model_list)
 
-        kwargs_numerics = {'supersampling_factor': 8, 'supersampling_convolution': True}
+        kwargs_numerics = {'supersampling_factor': 1, 'supersampling_convolution': False}
         lensed_model = ImageModel(data_class=data, psf_class=psf, kwargs_numerics=kwargs_numerics, lens_model_class=lens_model, source_model_class=src_light_model, lens_light_model_class=lens_light_model)
-        lensed_img = lensed_model.image(lens_kwargs, src_light_kwargs, kwargs_lens_light=lens_light_kwargs, kwargs_ps=None)
-
-        poisson = image_util.add_poisson(lensed_img, exp_time=exp_time)
-        bkg = image_util.add_background(lensed_img, sigma_bkd=background_rms)
-        lensed_full_noised = (lensed_img + poisson + bkg).astype(np.float32)
-
-        result = torch.from_numpy(lensed_full_noised).reshape(1, slen, slen)
+        lensed_img = lensed_model.image(lens_kwargs, src_light_kwargs, kwargs_lens_light=lens_light_kwargs, kwargs_ps=None).astype(np.float32)
+        result = torch.from_numpy(lensed_img).reshape(1, slen, slen)
         
         if self.generate_residual:
             main_lensed_model = ImageModel(data_class=data, psf_class=psf, kwargs_numerics=kwargs_numerics, lens_model_class=main_lens_model, source_model_class=src_light_model, lens_light_model_class=lens_light_model)
@@ -506,13 +501,13 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
                     residual_mask += (labels == label)
             residual_mask = residual_mask.astype(bool)
 
-            residualized_result = np.zeros(lensed_full_noised.shape)
-            residualized_result[residual_mask] = lensed_full_noised[residual_mask]
+            residualized_result = np.zeros(lensed_img.shape)
+            residualized_result[residual_mask] = lensed_img[residual_mask]
 
             k_display_residuals = False
             if k_display_residuals:
                 f, axes = plt.subplots(1, 3, figsize=(12, 8), sharex=False, sharey=False)
-                axes[0].imshow(lensed_full_noised)
+                axes[0].imshow(lensed_img)
                 axes[1].imshow(main_lensed_img)
                 axes[2].imshow(residualized_result)
                 plt.savefig("residuals.png")

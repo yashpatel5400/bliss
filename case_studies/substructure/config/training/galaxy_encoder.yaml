@@ -13,3 +13,7 @@ training:
 datasets:
     simulated:
         train_tag: "global"
+ 
+models:
+    lens_decoder:
+        generate_residual: False
