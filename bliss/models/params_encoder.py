@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Optional, Union
 
+from enum import Enum
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -22,90 +23,21 @@ from bliss.models.detection_encoder import (
     LogBackgroundTransform,
     make_enc_final,
 )
-from bliss.models.params_encoder import ParamsEncoder
 
+class IntervalType(Enum):
+    OPEN = 1
+    HALFOPEN = 2
+    CLOSED = 3
 
-def get_subhalo_params_nll(true_params, params):
-    """Get NLL of distributional parameters conditioned on the true galaxy parameters.
+def get_support_type(support):
+    lower, upper = support
+    if lower is None and upper is None:
+        return IntervalType.OPEN
+    elif lower is not None and upper is not None:
+        return IntervalType.CLOSED
+    return IntervalType.HALFOPEN
 
-    Args:
-        true_params:
-            A tensor of the number of the true values of the galaxy parameters. Parameters
-            much match the Galsim bulge-plus-disk galaxy parameterization,
-            i.e. (total_flux, disk_frac, beta_radians, disk_q, a_d, bulge_q, a_b)
-        params:
-            A tensor of the number of the predicted values of the galaxy parameters (must
-            also match Galsim bulge-plus-disk)
-
-    Returns:
-        A tensor value of the NLL (typically used as a loss to backpropagate)
-    """
-    assert true_params.shape[:-1] == params.shape[:-1]
-    true_params = true_params.view(-1, true_params.shape[-1]).transpose(0, 1)
-    params = params.view(-1, params.shape[-1]).transpose(0, 1)
-
-    subhalo_R, subhalo_theta_R = true_params
-    transformed_param_var_dist = [
-        (subhalo_R, LogNormal),
-        (subhalo_theta_R, LogNormal),
-    ]
-
-    # compute log-likelihoods of parameters and negate at end for NLL loss
-    log_prob = torch.zeros(1, requires_grad=True).to(device=true_params.device)
-    for i, (transformed_param, var_dist) in enumerate(transformed_param_var_dist):
-        transformed_param_mean = params[2 * i]
-        transformed_param_logvar = params[2 * i + 1]
-        transformed_param_sd = (transformed_param_logvar.exp() + 1e-5).sqrt()
-
-        parameterized_dist = var_dist(transformed_param_mean, transformed_param_sd)
-        log_prob += parameterized_dist.log_prob(transformed_param).mean()
-
-    return -log_prob
-
-
-def sample_subhalo_encoder(var_dist_params, deterministic: Optional[bool]):
-    """Sample from the encoded variational distribution.
-
-    Args:
-        var_dist_params: The output of `self.encode(image_ptiles)`,
-            which is the distributional parameters in matrix form.
-
-    Returns:
-        A tensor with shape `n_samples * n_ptiles * max_sources * 7`
-        consisting of Galsim bulge-plus-disk parameters.
-    """
-
-    subhalo_latent_dim = 2
-    params_shape = list(var_dist_params[..., 0].shape) + [subhalo_latent_dim]
-    subhalo_params = torch.zeros(params_shape)
-
-    for latent_dim in range(subhalo_latent_dim):
-        dist_mean = var_dist_params[..., 2 * latent_dim]
-        dist_logvar = var_dist_params[..., 2 * latent_dim + 1]
-        dist_sd = (dist_logvar.exp() + 1e-5).sqrt()
-        dist = Normal(dist_mean, dist_sd)
-
-        if deterministic is not None:
-            param = dist.mean
-        else:
-            param = dist.rsample()
-        positive_param_idxs = {0, 1}
-
-        if latent_dim in positive_param_idxs:
-            param = param.exp()
-        subhalo_params[..., latent_dim] = param
-    return subhalo_params
-
-
-class SubhaloEncoder(pl.LightningModule):
-    """Encodes the distribution of a latent variable representing a galaxy encoded with Galsim.
-
-    This class implements the galaxy encoder, which is supposed to take in
-    an astronomical image of size slen * slen and returns a latent variable
-    representation of this image corresponding to the 7 parameters of a bulge-plus-disk
-    Galsim galaxy (total_flux, disk_frac, beta_radians, disk_q, a_d, bulge_q, a_b).
-    """
-
+class ParamsEncoder(pl.LightningModule):
     def __init__(
         self,
         input_transform: Union[ConcatBackgroundTransform, LogBackgroundTransform],
@@ -116,8 +48,11 @@ class SubhaloEncoder(pl.LightningModule):
         channel: int,
         spatial_dropout: float,
         dropout: float,
+        param_supports = None,
+        params_filter_tag = None,
         optimizer_params: dict = None,
         checkpoint_path: Optional[str] = None,
+        precentered: Optional[bool] = False,
     ):
         super().__init__()
 
@@ -126,21 +61,28 @@ class SubhaloEncoder(pl.LightningModule):
         self.tile_slen = tile_slen
         self.ptile_slen = ptile_slen
         
-        self.slen = self.ptile_slen - 2 * self.tile_slen  # will always crop 2 * tile_slen
+        self.precentered = precentered
+        if self.precentered:
+            self.slen = self.ptile_slen
+        else:
+            self.slen = self.ptile_slen - 2 * self.tile_slen  # will always crop 2 * tile_slen
         self.optimizer_params = optimizer_params
 
         assert (ptile_slen - tile_slen) % 2 == 0
         self.border_padding = (ptile_slen - tile_slen) // 2
 
+        self.param_supports = param_supports
+        self.params_filter_tag = params_filter_tag
+        
         # will be trained.
-        latent_dim = 2
+        self.latent_dim = len(self.param_supports)
         dim_enc_conv_out = ((self.slen + 1) // 2 + 1) // 2
         n_bands_in = self.input_transform.output_channels(n_bands)
         self.enc_conv = EncoderCNN(n_bands_in, channel, spatial_dropout)
         self.enc_final = make_enc_final(
             channel * 4 * dim_enc_conv_out**2,
             hidden,
-            2 * latent_dim,
+            2 * self.latent_dim,
             dropout,
         )
 
@@ -164,13 +106,16 @@ class SubhaloEncoder(pl.LightningModule):
 
     def encode(self, image_ptiles: Tensor, tile_locs: Tensor) -> Tensor:
         n_samples, n_ptiles, max_sources, _ = tile_locs.shape
-        centered_ptiles = self._get_images_in_centered_tiles(image_ptiles, tile_locs)
+        if self.precentered:
+            centered_ptiles = image_ptiles.unsqueeze(1)
+        else:
+            centered_ptiles = self._get_images_in_centered_tiles(image_ptiles, tile_locs)
         assert centered_ptiles.shape[-1] == centered_ptiles.shape[-2] == self.slen
         x = rearrange(centered_ptiles, "ns np c h w -> (ns np) c h w")
         enc_conv_output = self.enc_conv(x)
-        subhalo_params_flat = self.enc_final(enc_conv_output)
+        params_flat = self.enc_final(enc_conv_output)
         return rearrange(
-            subhalo_params_flat,
+            params_flat,
             "(ns np ms) d -> ns np ms d",
             ns=n_samples,
             np=n_ptiles,
@@ -179,8 +124,8 @@ class SubhaloEncoder(pl.LightningModule):
 
     def sample(self, image_ptiles: Tensor, tile_locs: Tensor, deterministic: Optional[bool]):
         var_dist_params = self.encode(image_ptiles, tile_locs)
-        subhalo_params = sample_subhalo_encoder(var_dist_params, deterministic)
-        return subhalo_params.to(device=var_dist_params.device)
+        params = self.sample_encoder(var_dist_params, deterministic)
+        return params.to(device=var_dist_params.device)
 
     def training_step(self, batch, batch_idx):
         """Pytorch lightning training step."""
@@ -223,23 +168,85 @@ class SubhaloEncoder(pl.LightningModule):
         )
         image_ptiles = rearrange(image_ptiles, "n nth ntw b h w -> (n nth ntw) b h w")
         locs = rearrange(tile_catalog.locs, "n nth ntw ns hw -> 1 (n nth ntw) ns hw")
-        subhalo_params_pred = self.encode(image_ptiles, locs)
-        subhalo_params_pred = rearrange(
-            subhalo_params_pred,
+        params_pred = self.encode(image_ptiles, locs)
+        params_pred = rearrange(
+            params_pred,
             "ns (n nth ntw) ms d -> (ns n) nth ntw ms d",
             ns=1,
             nth=tile_catalog.n_tiles_h,
             ntw=tile_catalog.n_tiles_w,
         )
 
-        loss = get_subhalo_params_nll(
-            batch["subhalo_params"],
-            subhalo_params_pred,
+        if self.params_filter_tag is not None:
+            params_filter = batch[self.params_filter_tag]
+        else:
+            params_filter = None
+        loss = self.get_params_nll(
+            params_filter,
+            batch["params"],
+            params_pred,
         )
 
         return {
             "loss": loss,
         }
+
+    def get_params_nll(self, params_filter, true_params, params):
+        assert true_params.shape[:-1] == params.shape[:-1]
+        true_params = true_params.view(-1, true_params.shape[-1]).transpose(0, 1)
+        params = params.view(-1, params.shape[-1]).transpose(0, 1)
+        
+        if params_filter:
+            true_params = true_params[:, params_filter > 0]
+            params = params[:, params_filter > 0]
+
+        # compute log-likelihoods of parameters and negate at end for NLL loss
+        log_prob = torch.zeros(1, requires_grad=True).to(device=true_params.device)
+        for i, param_support in enumerate(self.param_supports):
+            param_support = param_support
+            param_support_type = get_support_type(param_support)
+            transformed_param_mean = params[2 * i]
+            transformed_param_logvar = params[2 * i + 1]
+            transformed_param_sd = (transformed_param_logvar.exp() + 1e-5).sqrt()
+
+            param = params[i]
+            if param_support_type == IntervalType.OPEN:
+                transformed_param = param
+            elif param_support_type == IntervalType.HALFOPEN:
+                transformed_param = torch.log(param - param_support[0])
+            elif param_support_type == IntervalType.CLOSED:
+                transformed_param = torch.logit((param - param_support[0]) / (param_support[1] - param_support[0]))
+
+            parameterized_dist = Normal(transformed_param_mean, transformed_param_sd)
+            log_prob += parameterized_dist.log_prob(transformed_param).mean()
+
+        return -log_prob
+
+
+    def sample_encoder(self, var_dist_params, deterministic: Optional[bool]):
+        params_shape = list(var_dist_params[..., 0].shape) + [self.latent_dim]
+        params = torch.zeros(params_shape)
+
+        for i, param_support in enumerate(self.param_supports):
+            dist_mean = var_dist_params[..., 2 * i]
+            dist_logvar = var_dist_params[..., 2 * i + 1]
+            dist_sd = (dist_logvar.exp() + 1e-5).sqrt()
+            dist = Normal(dist_mean, dist_sd)
+
+            if deterministic is not None:
+                transformed_param = dist.mean
+            else:
+                transformed_param = dist.rsample()
+            
+            param_support_type = get_support_type(param_support)
+            if param_support_type == IntervalType.OPEN:
+                param = transformed_param
+            elif param_support_type == IntervalType.HALFOPEN:
+                param = transformed_param.exp() + param_support[0]
+            elif param_support_type == IntervalType.CLOSED:
+                param = torch.sigmoid(transformed_param) * (param_support[1] - param_support[0]) + param_support[0]
+            params[..., i] = param
+        return params
 
     def _get_images_in_centered_tiles(self, image_ptiles: Tensor, tile_locs: Tensor) -> Tensor:
         log_image_ptiles = self.input_transform(image_ptiles)
@@ -253,40 +260,3 @@ class SubhaloEncoder(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         pass
-
-
-class SubhaloParamsEncoder(ParamsEncoder):
-    def __init__(
-        self,
-        input_transform: Union[ConcatBackgroundTransform, LogBackgroundTransform],
-        n_bands: int,
-        tile_slen: int,
-        ptile_slen: int,
-        hidden: int,
-        channel: int,
-        spatial_dropout: float,
-        dropout: float,
-        optimizer_params: dict = None,
-        checkpoint_path: Optional[str] = None,
-        precentered: Optional[bool] = False,
-    ):
-        param_supports = [
-            (0, None), # subhalo_R
-            (0, None), # subhalo_theta_R
-        ]
-        params_filter_tag = None
-        super(SubhaloParamsEncoder).__init__(
-            input_transform=input_transform,
-            n_bands=n_bands,
-            tile_slen=tile_slen,
-            ptile_slen=ptile_slen,
-            hidden=hidden,
-            channel=channel,
-            spatial_dropout=spatial_dropout,
-            dropout=dropout,
-            optimizer_params=optimizer_params,
-            checkpoint_path=checkpoint_path,
-            precentered=precentered,
-            param_supports=param_supports,
-            params_filter_tag=params_filter_tag,
-        )
