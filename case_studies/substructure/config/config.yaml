@@ -12,7 +12,7 @@ hydra:
 
 mode: train
 
-gpus: 1 # use a single gpu by default.
+gpus: 4 # use a single gpu by default.
 
 paths:
     root: ${oc.env:BLISS_HOME}
@@ -142,7 +142,7 @@ models:
             _target_: bliss.models.galsim_decoder.SingleGalsimGalaxyPrior
             flux_sample: "pareto"
             min_flux: 622.0
-            max_flux: 1e6
+            max_flux: 1e3
             alpha: 0.47
             a_sample: "gamma"
             a_concentration: 0.39330758068481686
@@ -153,7 +153,7 @@ models:
             _target_: bliss.models.galsim_decoder.SingleGalsimGalaxyPrior
             flux_sample: "pareto"
             min_flux: 312
-            max_flux: 1e4
+            max_flux: 1e3
             alpha: 0.47
             a_sample: "gamma"
             a_concentration: 0.39330758068481686

@@ -501,7 +501,7 @@ class SubstructurePrior(pl.LightningModule):
         base_centers = sample_params_from_dist(torch.randn, 2)
 
         lens_params = torch.zeros((batch_size, 5))
-        lens_params[:, 0:1] = base_radii * 15.0 + 10.0
+        lens_params[:, 0:1] = base_radii * 5.0 + 18.0
         lens_params[:, 1:3] = slen // 2
 
         # ellipticities must satisfy some angle relationships

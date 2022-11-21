@@ -66,7 +66,7 @@ class SimulatedDataset(pl.LightningDataModule, IterableDataset):
 
         torch.multiprocessing.set_start_method('spawn')
         self.setup_gpu = False
-        BUF_SIZE = 2
+        BUF_SIZE = 4
         self.data_queue = Queue(BUF_SIZE)
         producer_thread = threading.Thread(target=self.populate_queue, args=())
         producer_thread.start()

@@ -383,7 +383,7 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
         kwargs_source = []
         if disk_flux > 0:
             b_d = a_d * disk_q
-            disk_hlr_arcsecs = np.sqrt(a_d * b_d)
+            disk_hlr_arcsecs = np.sqrt(a_d * b_d) / .396
             ell_factor_disk = (1 - disk_q) / (1 + disk_q)
             e1_disk = ell_factor_disk * np.cos(beta_radians)
             e2_disk = ell_factor_disk * np.sin(beta_radians)
@@ -398,7 +398,7 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
             kwargs_source.append(kwargs_disk_sersic_source)
         if bulge_flux > 0:
             b_b = bulge_q * a_b
-            bulge_hlr_arcsecs = np.sqrt(a_b * b_b)
+            bulge_hlr_arcsecs = np.sqrt(a_b * b_b) / .396
             ell_factor_bulge = (1 - bulge_q) / (1 + bulge_q)
             e1_bulge = ell_factor_bulge * np.cos(beta_radians)
             e2_bulge = ell_factor_bulge * np.sin(beta_radians)
@@ -433,13 +433,16 @@ class LenstronomySingleLensedGalaxyDecoder(PSFDecoder):
         
         # lenstronomy rendering logic takes the center of the image to be (0, 0) so all the centers need to be shifted accordingly
         lens_model_list = ['SIE']
-        theta_e, lens_x, lens_y, lens_e1, lens_e2 = lens_sie_params
+        theta_e = lens_sie_params
+        lens_x = 40
+        lens_y = 40
+        # theta_e, lens_x, lens_y, lens_e1, lens_e2 = lens_sie_params
         lens_kwargs = [{
-            "theta_E": theta_e, 
+            "theta_E": theta_e[0], 
             "center_x": lens_x - (slen // 2), 
             "center_y": lens_y - (slen // 2), 
-            "e1": lens_e1, 
-            "e2": lens_e2,
+            "e1": 0, # lens_e1, 
+            "e2": 0, # lens_e2,
         }]
 
         main_lens_kwargs = copy.deepcopy(lens_kwargs)

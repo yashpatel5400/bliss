@@ -33,10 +33,10 @@ class LensEncoder(ParamsEncoder):
             (0, 1), # bulge_q
             (0, None), # a_b
             (0, None), # theta_e
-            (None, None), # center_x
-            (None, None), # center_y
-            (-1, 1), # e1
-            (-1, 1), # e2
+            # (None, None), # center_x
+            # (None, None), # center_y
+            # (-1, 1), # e1
+            # (-1, 1), # e2
         ]
         super().__init__(
             input_transform=input_transform,
