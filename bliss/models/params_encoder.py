@@ -235,7 +235,7 @@ class ParamsEncoder(pl.LightningModule):
             dist_sd = (dist_logvar.exp() + 1e-5).sqrt()
             dist = Normal(dist_mean, dist_sd)
 
-            if deterministic is not None:
+            if deterministic:
                 transformed_param = dist.mean
             else:
                 transformed_param = dist.rsample()

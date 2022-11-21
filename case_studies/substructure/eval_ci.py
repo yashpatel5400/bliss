@@ -28,73 +28,70 @@ with initialize(config_path="config"):
     cfg = compose("config", overrides=[])
 
 device = torch.device("cuda:0")
-enc, dec = load_models(cfg, device)
-bp = enc.border_padding
-torch.cuda.empty_cache()
+galaxy_encoder = instantiate(cfg.models.galaxy_encoder).to(device).eval()
+galaxy_encoder.load_state_dict(torch.load(cfg.plots.galaxy_checkpoint, map_location=galaxy_encoder.device))
 
-enc.n_rows_per_batch = 10
-enc.n_images_per_batch = 15
+lens_encoder = instantiate(cfg.models.lens_encoder).to(device).eval()
+lens_encoder.load_state_dict(torch.load(cfg.plots.lens_checkpoint, map_location=lens_encoder.device))
+
+torch.cuda.empty_cache()
 
 dataset = instantiate(
     cfg.datasets.simulated,
     generate_device="cuda:0",
 )
 
-test_type = "galaxy"
-
-if test_type == "lens":
-    total_contained = np.zeros(12)
-else:
-    total_contained = np.zeros(7)
-
-total_lenses = 0
+total_params = 0
 batch_size = 1
-trials = 10_000
+trials = 10#_000
 num_samples = 100
 
+coverage_type_to_encoder = {
+    "galaxy": galaxy_encoder,
+    "lens": lens_encoder,
+}
+
+num_galaxy_params = 7
+num_lens_params = 8
+coverage_type_to_result = {
+    "galaxy": np.zeros(num_galaxy_params),
+    "lens": np.zeros(num_lens_params),
+}
+
 for _ in range(trials):
-    tile_catalog = dataset.sample_prior(
-        batch_size, cfg.datasets.simulated.n_tiles_h, cfg.datasets.simulated.n_tiles_w
+    tile_catalog = dataset.sample_prior(batch_size, cfg.datasets.simulated.n_tiles_h, cfg.datasets.simulated.n_tiles_w)
+    packed_images, backgrounds = dataset.simulate_image_from_catalog(tile_catalog)
+    images = packed_images["global"]
+
+    full_true = tile_catalog["global"].cpu().to_full_params()
+    image_ptiles = get_images_in_tiles(
+        torch.cat((images, backgrounds), dim=1),
+        80,
+        80,
     )
-    tile_catalog.set_all_fluxes_and_mags(dataset.image_decoder)
-    images, backgrounds = dataset.simulate_image_from_catalog(tile_catalog)
+    image_ptiles = rearrange(image_ptiles, "n nth ntw b h w -> (n nth ntw) b h w")
+    locs = rearrange(tile_catalog["global"].locs, "n nth ntw ns hw -> 1 (n nth ntw) ns hw")
 
-    full_true = tile_catalog.cpu().to_full_params()
-
-    if test_type == "lens":
-        true_gal_bool = full_true["lensed_galaxy_bools"].cpu().numpy()[0, :, 0].astype("bool")
-        true_lens = full_true["lens_params"].cpu().numpy()[0, ...][true_gal_bool]
-    else:
-        true_gal_bool = full_true["galaxy_bools"].cpu().numpy()[0, :, 0].astype("bool")
-        true_lens = full_true["galaxy_params"].cpu().numpy()[0, ...][true_gal_bool]
-
-    samples = []
-    for _ in range(num_samples):
-        tile_sample_dict = enc.sample(images, backgrounds, 1, tile_catalog)
-        tile_sample = TileCatalog.from_flat_dict(
-            enc.detection_encoder.tile_slen,
-            cfg.datasets.simulated.n_tiles_h,
-            cfg.datasets.simulated.n_tiles_w,
-            {k: v.squeeze(0) for k, v in tile_sample_dict.items()},
-        )
-        tile_sample.locs = copy.deepcopy(tile_catalog.locs)
-        tile_sample.n_sources = copy.deepcopy(tile_catalog.n_sources)
-        full_sample = tile_sample.cpu().to_full_params()
-        if test_type == "lens":
-            lens_sample = full_sample["lens_params"].cpu().numpy()[0, ...][true_gal_bool]
+    for coverage_type in coverage_type_to_encoder:
+        if coverage_type == "lens":
+            true_params = full_true["lens_params"].cpu().numpy()[0, ...][:, :num_lens_params]
         else:
-            lens_sample = full_sample["galaxy_params"].cpu().numpy()[0, ...][true_gal_bool]
-        samples.append(lens_sample)
+            true_params = full_true["galaxy_params"].cpu().numpy()[0, ...][:, :num_galaxy_params]
 
-    samples = np.array(samples)
+        samples = []
+        for _ in range(num_samples):
+            params = coverage_type_to_encoder[coverage_type].sample(image_ptiles, locs, deterministic=False)
+            samples.append(params.detach().cpu().numpy())
+            
+        samples = np.array(samples)
 
-    confidence_percent = 0.90
-    alpha = ((1 - confidence_percent) / 2) * 100
-    lower_ci = np.percentile(samples, alpha, axis=0)
-    upper_ci = np.percentile(samples, 100 - alpha, axis=0)
+        confidence_percent = 0.90
+        alpha = ((1 - confidence_percent) / 2) * 100
+        lower_ci = np.percentile(samples, alpha, axis=0)
+        upper_ci = np.percentile(samples, 100 - alpha, axis=0)
 
-    contained = np.logical_and(lower_ci <= true_lens, true_lens <= upper_ci).astype("int")
-    total_contained += np.sum(contained, axis=0).squeeze()
-    total_lenses += true_lens.shape[0]
-
-print(total_contained / total_lenses)
+        contained = np.logical_and(lower_ci <= true_params, true_params <= upper_ci).astype("int")
+        coverage_type_to_result[coverage_type] += np.sum(contained, axis=0).squeeze()
+        
+for coverage_type in coverage_type_to_result:
+    print(f"{coverage_type} : {coverage_type_to_result[coverage_type] / trials}")
