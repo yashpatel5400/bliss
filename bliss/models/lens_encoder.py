@@ -22,7 +22,6 @@ class LensEncoder(ParamsEncoder):
         dropout: float,
         optimizer_params: dict = None,
         checkpoint_path: Optional[str] = None,
-        precentered: Optional[bool] = False,
     ):
         param_supports = [
             (0, None), # total_flux
@@ -32,7 +31,7 @@ class LensEncoder(ParamsEncoder):
             (0, None), # a_d
             (0, 1), # bulge_q
             (0, None), # a_b
-            (10, 40), # theta_e
+            (10, 50), # theta_e
             (None, None), # center_x
             (None, None), # center_y
             (-1, 1), # e1
@@ -50,7 +49,6 @@ class LensEncoder(ParamsEncoder):
             dropout=dropout,
             optimizer_params=optimizer_params,
             checkpoint_path=checkpoint_path,
-            precentered=precentered,
             param_supports=param_supports,
             params_tag="lens_params",
             params_filter_tag="lensed_galaxy_bools",

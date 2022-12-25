@@ -329,7 +329,7 @@ class ImagePrior(pl.LightningModule):
             base_qs = self._sample_param_from_dist(base_shape, 1, torch.rand, device)
             base_betas = self._sample_param_from_dist(base_shape, 1, torch.rand, device)
 
-            lens_params[..., 0:1] = base_radii * 25.0 + 5.0
+            lens_params[..., 0:1] = base_radii * 30.0 + 10.0
             lens_params[..., 1:3] = base_centers * 1.0
 
             # ellipticities must satisfy some angle relationships

@@ -22,7 +22,6 @@ class GalsimEncoder(ParamsEncoder):
         dropout: float,
         optimizer_params: dict = None,
         checkpoint_path: Optional[str] = None,
-        precentered: Optional[bool] = False,
     ):
         # bulge-plus-disk for Galsim inference
         param_supports = [
@@ -46,7 +45,6 @@ class GalsimEncoder(ParamsEncoder):
             dropout=dropout,
             optimizer_params=optimizer_params,
             checkpoint_path=checkpoint_path,
-            precentered=precentered,
             param_supports=param_supports,
             params_tag="galaxy_params",
             params_filter_tag="galaxy_bools",
