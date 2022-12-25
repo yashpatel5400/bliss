@@ -1,0 +1,15 @@
+# @package _global_
+training:
+  name: "subhalo_detection_encoder"
+  model: ${models.subhalo_detection_encoder}
+  dataset: ${datasets.simulated}
+  optimizer_params:
+    lr: 1e-4
+  n_epochs: 3501
+  trainer:
+    enable_checkpointing: True
+    check_val_every_n_epoch: 50
+
+datasets:
+    simulated:
+        train_tag: "subhalos"
