@@ -89,6 +89,7 @@ class ImagePrior(pl.LightningModule):
         alpha: float,
         prob_galaxy: float,
         prob_lensed_galaxy: float = 0.0,
+        precentered: bool = False,
         galaxy_prior: Optional[GalaxyPrior] = None,
         lensed_galaxy_prior: Optional[GalaxyPrior] = None,
     ):
@@ -116,6 +117,7 @@ class ImagePrior(pl.LightningModule):
         self.f_min = f_min
         self.f_max = f_max
         self.alpha = alpha
+        self.precentered = precentered
 
         self.prob_galaxy = float(prob_galaxy)
         self.galaxy_prior = galaxy_prior
@@ -149,6 +151,9 @@ class ImagePrior(pl.LightningModule):
         n_sources = self._sample_n_sources(batch_size, n_tiles_h, n_tiles_w)
         is_on_array = get_is_on_from_n_sources(n_sources, self.max_sources)
         locs = self._sample_locs(is_on_array)
+
+        if self.precentered:
+            locs *= 0
 
         galaxy_bools, star_bools = self._sample_n_galaxies_and_stars(is_on_array)
         lensed_galaxy_bools = self._sample_n_lenses(is_on_array, galaxy_bools)
