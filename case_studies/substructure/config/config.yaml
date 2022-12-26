@@ -18,7 +18,7 @@ paths:
     root: ${oc.env:BLISS_HOME}
     sdss: ${paths.root}/data/sdss
     data: ${paths.root}/data
-    project: ${paths.root}/case_studies/substructures
+    project: ${paths.root}/case_studies/substructure
     output: ${paths.project}/output
 
 datasets:

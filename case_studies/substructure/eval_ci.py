@@ -28,31 +28,27 @@ with initialize(config_path="config"):
     cfg = compose("config", overrides=[])
 
 device = torch.device("cuda:0")
-enc, dec = load_models(cfg, device)
-bp = enc.border_padding
 torch.cuda.empty_cache()
-
-enc.n_rows_per_batch = 10
-enc.n_images_per_batch = 15
 
 dataset = instantiate(
     cfg.datasets.simulated,
-    generate_device="cuda:0",
+    generate_device=device,
 )
 
-test_type = "galaxy"
+galaxy = instantiate(cfg.models.galaxy_encoder).to(device).eval()
+galaxy.load_state_dict(torch.load(cfg.plots.galaxy_checkpoint, map_location=galaxy.device))
 
-if test_type == "lens":
-    total_contained = np.zeros(12)
-else:
-    total_contained = np.zeros(7)
+lens = instantiate(cfg.models.lens_encoder).to(device).eval()
+lens.load_state_dict(torch.load(cfg.plots.lens_checkpoint, map_location=lens.device))
 
-total_lenses = 0
+contained = [np.zeros(7), np.zeros(12)]
+
+print_freq = 50
 batch_size = 1
 trials = 10_000
 num_samples = 100
 
-for _ in range(trials):
+for trial in range(trials):
     tile_catalog = dataset.sample_prior(
         batch_size, cfg.datasets.simulated.n_tiles_h, cfg.datasets.simulated.n_tiles_w
     )
@@ -60,41 +56,26 @@ for _ in range(trials):
     images, backgrounds = dataset.simulate_image_from_catalog(tile_catalog)
 
     full_true = tile_catalog.cpu().to_full_params()
+    img_bg = torch.cat((images[0], backgrounds[0]), dim=0).unsqueeze((0)).to(device)
 
-    if test_type == "lens":
-        true_gal_bool = full_true["lensed_galaxy_bools"].cpu().numpy()[0, :, 0].astype("bool")
-        true_lens = full_true["lens_params"].cpu().numpy()[0, ...][true_gal_bool]
-    else:
-        true_gal_bool = full_true["galaxy_bools"].cpu().numpy()[0, :, 0].astype("bool")
-        true_lens = full_true["galaxy_params"].cpu().numpy()[0, ...][true_gal_bool]
-
-    samples = []
+    galaxy_samples = []
+    lens_samples = []
     for _ in range(num_samples):
-        tile_sample_dict = enc.sample(images, backgrounds, 1, tile_catalog)
-        tile_sample = TileCatalog.from_flat_dict(
-            enc.detection_encoder.tile_slen,
-            cfg.datasets.simulated.n_tiles_h,
-            cfg.datasets.simulated.n_tiles_w,
-            {k: v.squeeze(0) for k, v in tile_sample_dict.items()},
-        )
-        tile_sample.locs = copy.deepcopy(tile_catalog.locs)
-        tile_sample.n_sources = copy.deepcopy(tile_catalog.n_sources)
-        full_sample = tile_sample.cpu().to_full_params()
-        if test_type == "lens":
-            lens_sample = full_sample["lens_params"].cpu().numpy()[0, ...][true_gal_bool]
-        else:
-            lens_sample = full_sample["galaxy_params"].cpu().numpy()[0, ...][true_gal_bool]
-        samples.append(lens_sample)
+        galaxy_samples.append(galaxy.sample(img_bg, tile_catalog.locs[0], deterministic=False).cpu().numpy())
+        lens_samples.append(lens.sample(img_bg, tile_catalog.locs[0], deterministic=False).cpu().numpy())
 
-    samples = np.array(samples)
+    for i, (samples_list, truth) in enumerate(zip((galaxy_samples, lens_samples), (full_true["galaxy_params"], full_true["lens_params"]))):
+        samples = np.array(samples_list)
+        truth = truth.numpy()
 
-    confidence_percent = 0.90
-    alpha = ((1 - confidence_percent) / 2) * 100
-    lower_ci = np.percentile(samples, alpha, axis=0)
-    upper_ci = np.percentile(samples, 100 - alpha, axis=0)
+        confidence_percent = 0.90
+        alpha = ((1 - confidence_percent) / 2) * 100
+        lower_ci = np.percentile(samples, alpha, axis=0)
+        upper_ci = np.percentile(samples, 100 - alpha, axis=0)
 
-    contained = np.logical_and(lower_ci <= true_lens, true_lens <= upper_ci).astype("int")
-    total_contained += np.sum(contained, axis=0).squeeze()
-    total_lenses += true_lens.shape[0]
+        contained_trial = np.logical_and(lower_ci <= truth, truth <= upper_ci).astype("int")
+        contained[i] += np.sum(contained_trial, axis=0).squeeze()
 
-print(total_contained / total_lenses)
+    if trial % print_freq == 0:
+        for enc_type, total_contained in zip(("galaxy", "lens"), contained):
+            print(f"[Trial {trial}] {enc_type} : {total_contained / (trial + 1)}")
