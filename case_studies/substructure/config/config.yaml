@@ -24,10 +24,16 @@ paths:
 datasets:
     simulated:
         _target_: bliss.datasets.simulated.SimulatedDataset
-        decoder: ${models.decoder}
+        decoder: ${models.lens_decoder}
         prior: ${models.prior}
+        substructure_prior: ${models.substructure_prior}
+        tile_slen: 84
         n_tiles_h: 1
         n_tiles_w: 1
+        substructure_tile_slen: 4
+        substructure_n_tiles_h: 14
+        substructure_n_tiles_w: 14
+        train_tag: "substructure"
         background:
             _target_: bliss.datasets.background.SimulatedSDSSBackground
             sdss_dir: ${paths.sdss}
@@ -69,28 +75,15 @@ models:
         psf_slen: 25
         sdss_bands:
             - 2
-    lensing_binary:
-        _target_: bliss.models.lensing_binary_encoder.LensingBinaryEncoder
-        input_transform:
-            _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
-        n_bands: ${models.decoder.n_bands}
-        tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
-        channel: 8
-        hidden: 128
-        spatial_dropout: 0.0
-        dropout: 0.0
-    binary:
-        _target_: bliss.models.binary.BinaryEncoder
-        input_transform:
-            _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
-        n_bands: ${models.decoder.n_bands}
-        tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
-        channel: 8
-        hidden: 128
-        spatial_dropout: 0.0
-        dropout: 0.0
+    lens_decoder:
+            _target_: bliss.models.galsim_decoder.SingleLensedGalsimGalaxyDecoder
+            n_bands: 1
+            slen: 84
+            pixel_scale: 0.396
+            psf_params_file: ${paths.data}/sdss/5313/3/117/psField-005313-3-0117.fits
+            psf_slen: 25
+            sdss_bands:
+                - 2
     detection_encoder:
         _target_: bliss.models.detection_encoder.DetectionEncoder
         input_transform:
@@ -118,7 +111,7 @@ models:
         dropout: 0.0
     lens_encoder:
         _target_: bliss.models.lens_encoder.LensEncoder
-        input_transform:
+        input_transform: 
             _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
         n_bands: ${models.decoder.n_bands}
         tile_slen: ${models.decoder.tile_slen}
@@ -127,12 +120,6 @@ models:
         channel: 8
         spatial_dropout: 0.0
         dropout: 0.0
-    galaxy_net:
-        _target_: bliss.models.galaxy_net.OneCenteredGalaxyAE
-        slen: 53
-        latent_dim: 8
-        hidden: 256
-        n_bands: 1
     prior:
         _target_: bliss.models.prior.ImagePrior
         n_bands: 1
@@ -167,6 +154,17 @@ models:
             a_loc: 0.8371888967872619
             a_scale: 4.432725319432478
             a_bulge_disk_ratio: 2.0
+    substructure_prior:
+        _target_: bliss.models.prior.SubstructurePrior
+        n_bands: 1
+        max_sources: 1
+        mean_sources: 0.01
+        min_sources: 0
+        Rs_alpha_min: 1.0
+        Rs_alpha_max: 5.0
+        Rs_min: 2.0
+        Rs_max: 5.0
+    
 
 generate:
     dataset:

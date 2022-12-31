@@ -195,6 +195,7 @@ class SingleLensedGalsimGalaxyDecoder(SingleGalsimGalaxyDecoder):
         psf_slen: Optional[int] = None,
         sdss_bands: Optional[Tuple[int, ...]] = None,
     ) -> None:
+        self._s = 0.001
         super().__init__(
             slen=slen,
             n_bands=n_bands,
@@ -269,6 +270,75 @@ class SingleLensedGalsimGalaxyDecoder(SingleGalsimGalaxyDecoder):
         yg = ytg * np.cos(phirad) + xtg * np.sin(phirad)
         return (xg, yg)
 
+    def tnfw_deflection(self, x, y, lens_params):
+        center_y, center_x, alpha_Rs, Rs = lens_params.cpu().numpy()
+
+        # recenter because plocs have 0,0 in top left whereas coords have 0,0 at center
+        center_x += x[0,0] + self.border_padding
+        center_y += y[0,0] + self.border_padding
+        
+        r_trunc = 5 * Rs
+        rho0_input = self.alpha2rho0(alpha_Rs, Rs)
+        x_ = x - center_x
+        y_ = y - center_y
+        R = np.sqrt(x_ ** 2 + y_ ** 2)
+        R = np.maximum(R, self._s * Rs)
+        f_x, f_y = self.nfwAlpha(R, Rs, rho0_input, r_trunc, x_, y_)
+        return (f_x, f_y)
+
+    def alpha2rho0(self, alpha_Rs, Rs):
+        rho0 = alpha_Rs / (4. * Rs ** 2 * (1. + np.log(1. / 2.)))
+        return rho0
+
+    def nfwAlpha(self, R, Rs, rho0, r_trunc, ax_x, ax_y):
+        R = np.maximum(R, self._s * Rs)
+        x = R / Rs
+        x = np.maximum(x, self._s)
+        tau = float(r_trunc) / Rs
+        gx = self._g(x, tau)
+        a = 4 * rho0 * Rs * gx / x ** 2
+        return a * ax_x, a * ax_y
+
+    def _L(self, x, tau):
+        x = np.maximum(x, self._s)
+        return np.log(x * (tau + np.sqrt(tau ** 2 + x ** 2)) ** -1)
+
+    def F(self, x):
+        if isinstance(x, np.ndarray):
+            x = np.maximum(x, self._s)
+            nfwvals = np.zeros_like(x)
+            inds1 = np.where(x < 1)
+            inds2 = np.where(x > 1)
+            inds3 = np.where(x == 1)
+            nfwvals[inds1] = (1 - x[inds1] ** 2) ** -.5 * np.arctanh((1 - x[inds1] ** 2) ** .5)
+            nfwvals[inds2] = (x[inds2] ** 2 - 1) ** -.5 * np.arctan((x[inds2] ** 2 - 1) ** .5)
+            nfwvals[inds3] = 1
+            return nfwvals
+
+        elif isinstance(x, float) or isinstance(x, int):
+            x = np.maximum(x, 0)
+            if x == 1:
+                return 1
+            elif x == 0:
+                return 0
+            elif x < 1:
+                return (1 - x ** 2) ** -.5 * np.arctanh((1 - x ** 2) ** .5)
+            else:
+                return (x ** 2 - 1) ** -.5 * np.arctan((x ** 2 - 1) ** .5)
+
+    def _g(self, x, tau):
+        """
+        analytic solution of integral for NFW profile to compute deflection angel and gamma
+
+        :param x: R/Rs
+        :type x: float >0
+        """
+        x = np.maximum(x, self._s)
+        return tau ** 2 * (tau ** 2 + 1) ** -2 * (
+                (tau ** 2 + 1 + 2 * (x ** 2 - 1)) * self.F(x) + tau * np.pi + (tau ** 2 - 1) * np.log(tau) +
+                np.sqrt(tau ** 2 + x ** 2) * (-np.pi + self._L(x, tau) * (tau ** 2 - 1) * tau ** -1))
+
+
     def bilinear_interpolate_numpy(self, im, x, y):
         x0 = np.floor(x).astype(int)
         x1 = x0 + 1
@@ -292,7 +362,7 @@ class SingleLensedGalsimGalaxyDecoder(SingleGalsimGalaxyDecoder):
 
         return (i_a.T * wa).T + (i_b.T * wb).T + (i_c.T * wc).T + (i_d.T * wd).T
 
-    def lens_galsim(self, unlensed_image, lens_params):
+    def lens_galsim(self, unlensed_image, sie_lens_params, nfw_lens_params = None):
         nx, ny = unlensed_image.shape
         x_range = [-nx // 2, nx // 2]
         y_range = [-ny // 2, ny // 2]
@@ -303,7 +373,13 @@ class SingleLensedGalsimGalaxyDecoder(SingleGalsimGalaxyDecoder):
             ny - 1
         ) + y_range[0]
 
-        (xg, yg) = self.sie_deflection(x, y, lens_params)
+        (xg, yg) = self.sie_deflection(x, y, sie_lens_params)
+        for nfw_lens_param in nfw_lens_params:
+            if nfw_lens_param.any():
+                (xg_nfw, yg_nfw) = self.tnfw_deflection(x, y, nfw_lens_param)
+                xg += xg_nfw
+                yg += yg_nfw
+                
         lensed_image = self.bilinear_interpolate_numpy(
             unlensed_image, (x - xg) + nx // 2, (y - yg) + ny // 2
         )
@@ -321,6 +397,33 @@ class SingleLensedGalsimGalaxyDecoder(SingleGalsimGalaxyDecoder):
         lensed_src = self.lens_galsim(unlensed_src, pure_lens_params)
         return torch.from_numpy(lensed_src).reshape(1, slen, slen)
 
+    def render_lensed_system(
+        self,
+        main_deflector_params: Tensor,
+        subhalo_params: Tensor,
+        psf: galsim.GSObject,
+        slen: int,
+        offset: Optional[Tensor] = None,
+    ) -> Tensor:
+        lens_galaxy_params, src_galaxy_params, src_lens_params = main_deflector_params[:7], main_deflector_params[7:14], main_deflector_params[14:]
+        lens_galaxy = self._render_galaxy_np(lens_galaxy_params, psf, slen, offset)
+        unlensed_src = self._render_galaxy_np(src_galaxy_params, psf, slen, offset)
+        lensed_src = self.lens_galsim(unlensed_src, src_lens_params, subhalo_params)
+        return torch.from_numpy(lens_galaxy + lensed_src).reshape(1, slen, slen)
+
+    def render_images(self, tile_catalogs):
+        main_deflector_catalog = tile_catalogs["main_deflector"].to_full_params()
+        substructure_catalog = tile_catalogs["substructure"].to_full_params()
+
+        all_main_deflector_params = torch.cat([main_deflector_catalog["galaxy_params"], main_deflector_catalog["lens_params"]], axis=-1)
+        all_subhalo_params = torch.cat([substructure_catalog.plocs, substructure_catalog["subhalo_params"]], axis=-1)
+
+        self.border_padding = (self.slen - tile_catalogs["substructure"].n_tiles_h * tile_catalogs["substructure"].tile_slen) // 2
+        images = []
+        for ii, (main_deflector_params, subhalo_params) in enumerate(zip(all_main_deflector_params, all_subhalo_params)):
+            image = self.render_lensed_system(main_deflector_params[0], subhalo_params, self.psf_galsim, self.slen, None)
+            images.append(image)
+        return torch.stack(images, dim=0).to(substructure_catalog.plocs.device)
 
 class UniformGalsimPrior:
     def __init__(

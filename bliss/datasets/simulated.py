@@ -34,6 +34,12 @@ class SimulatedDataset(pl.LightningDataModule, IterableDataset):
         generate_device: str,
         num_workers: int = 0,
         fix_validation_set: bool = False,
+        tile_slen: int = 0,
+        train_tag: str = "",
+        substructure_prior: bool = False,
+        substructure_tile_slen: int = 0,
+        substructure_n_tiles_h: int = 0,
+        substructure_n_tiles_w: int = 0,
         valid_n_batches: Optional[int] = None,
     ):
         super().__init__()
@@ -52,6 +58,14 @@ class SimulatedDataset(pl.LightningDataModule, IterableDataset):
         
         self.num_workers = num_workers
         self.fix_validation_set = fix_validation_set
+        
+        self.tile_slen = tile_slen
+        self.train_tag = train_tag
+        self.substructure_prior = substructure_prior
+        self.substructure_tile_slen = substructure_tile_slen
+        self.substructure_n_tiles_h = substructure_n_tiles_h
+        self.substructure_n_tiles_w = substructure_n_tiles_w
+
         self.valid_n_batches = n_batches if valid_n_batches is None else valid_n_batches
 
         # check training will work.
@@ -78,12 +92,17 @@ class SimulatedDataset(pl.LightningDataModule, IterableDataset):
 
         while True:
             with torch.no_grad():
-                tile_catalog = self.sample_prior(self.batch_size, self.n_tiles_h, self.n_tiles_w)
-                image_collection, background = self.simulate_image_from_catalog(tile_catalog)
-                # if self.train_tag:
-                #     self.data_queue.put({**tile_catalog[self.train_tag].to_dict(), "images": image_collection[self.train_tag], "background": background})
-                # else:
-                self.data_queue.put({**tile_catalog.to_dict(), "images": image_collection, "background": background})
+                tile_catalogs = {}
+                tile_catalogs["main_deflector"] = self.image_prior.sample_prior(self.tile_slen, self.batch_size, self.n_tiles_h, self.n_tiles_w)
+                if self.substructure_prior:
+                    tile_catalogs["substructure"] = self.substructure_prior.sample_prior(self.substructure_tile_slen, self.batch_size, self.substructure_n_tiles_h, self.substructure_n_tiles_w)
+             
+                if self.train_tag:
+                    image_collection, background = self.simulate_image_from_catalog(tile_catalogs)
+                    self.data_queue.put({**tile_catalogs[self.train_tag].to_dict(), "images": image_collection, "background": background})
+                else:
+                    image_collection, background = self.simulate_image_from_catalog(tile_catalogs[0])
+                    self.data_queue.put({**tile_catalogs["main_deflector"].to_dict(), "images": image_collection, "background": background})
 
     image_prior: ImagePrior
     image_decoder: ImageDecoder
@@ -95,12 +114,12 @@ class SimulatedDataset(pl.LightningDataModule, IterableDataset):
             generate_device
         )
 
-    def sample_prior(self, batch_size: int, n_tiles_h: int, n_tiles_w: int) -> TileCatalog:
-        return self.image_prior.sample_prior(self.tile_slen, batch_size, n_tiles_h, n_tiles_w)
+    def sample_prior(self, batch_size: int, tile_slen: int, n_tiles_h: int, n_tiles_w: int) -> TileCatalog:
+        return self.image_prior.sample_prior(tile_slen, batch_size, n_tiles_h, n_tiles_w)
 
     def simulate_image_from_catalog(self, tile_catalog: TileCatalog) -> Tuple[Tensor, Tensor]:
         images = self.image_decoder.render_images(tile_catalog)
-        background = self.background.sample(images.shape)
+        background = self.background.sample(images.shape).to(images.device)
         images += background
         images = self._apply_noise(images)
         return images, background
@@ -118,9 +137,9 @@ class SimulatedDataset(pl.LightningDataModule, IterableDataset):
 
         return images
 
-    @property
-    def tile_slen(self) -> int:
-        return self.image_decoder.tile_slen
+    # @property
+    # def tile_slen(self) -> int:
+    #     return self.image_decoder.tile_slen
 
     def __iter__(self):
         for _ in range(self.n_batches):

@@ -153,7 +153,7 @@ class ImagePrior(pl.LightningModule):
         locs = self._sample_locs(is_on_array)
 
         if self.precentered:
-            locs *= 0
+            locs = locs * 0 + 0.5
 
         galaxy_bools, star_bools = self._sample_n_galaxies_and_stars(is_on_array)
         lensed_galaxy_bools = self._sample_n_lenses(is_on_array, galaxy_bools)
@@ -335,11 +335,94 @@ class ImagePrior(pl.LightningModule):
             base_betas = self._sample_param_from_dist(base_shape, 1, torch.rand, device)
 
             lens_params[..., 0:1] = base_radii * 30.0 + 10.0
-            lens_params[..., 1:3] = base_centers * 1.0
+            lens_params[..., 1:3] = base_centers
 
             # ellipticities must satisfy some angle relationships
-            beta_radians = (base_betas - 0.5) * (np.pi / 2)  # [-pi / 4, pi / 4]
-            ell_factors = (1 - base_qs) / (1 + base_qs)
+            beta_radians = (base_betas - 0.5) * (np.pi)  # [-pi / 2, pi / 2]
+            qs = base_qs * 0.5 + 0.5
+            ell_factors = (1 - qs) / (1 + qs)
             lens_params[..., 3:4] = ell_factors * torch.cos(beta_radians)
             lens_params[..., 4:5] = ell_factors * torch.sin(beta_radians)
         return lens_params * lensed_galaxy_bools
+
+
+
+class SubstructurePrior(pl.LightningModule):
+
+    def __init__(
+        self,
+        n_bands: int,
+        min_sources: int,
+        max_sources: int,
+        mean_sources: int,
+        Rs_alpha_min: float,
+        Rs_alpha_max: float,
+        Rs_min: float,
+        Rs_max: float,
+    ):
+        super().__init__()
+        self.n_bands = n_bands
+        assert max_sources > 0, "No sources will be drawn."
+        self.min_sources = min_sources
+        self.max_sources = max_sources
+        self.mean_sources = mean_sources
+
+        self.Rs_alpha_min = Rs_alpha_min
+        self.Rs_alpha_max = Rs_alpha_max
+        
+        self.Rs_min = Rs_min
+        self.Rs_max = Rs_max
+        
+    def sample_prior(
+        self, tile_slen: int, batch_size: int, n_tiles_h: int, n_tiles_w: int
+    ) -> TileCatalog:
+        assert n_tiles_h > 0
+        assert n_tiles_w > 0
+        n_sources = self._sample_n_sources(batch_size, n_tiles_h, n_tiles_w)
+        is_on_array = get_is_on_from_n_sources(n_sources, self.max_sources)
+        locs = self._sample_locs(is_on_array)
+
+        subhalo_params = self._sample_subhalo_params(is_on_array)
+
+        catalog_params = {
+            "n_sources": n_sources,
+            "locs": locs,
+            "subhalo_params": subhalo_params,
+        }
+
+        return TileCatalog(tile_slen, catalog_params)
+
+    def _sample_n_sources(self, batch_size, n_tiles_h, n_tiles_w):
+        # returns number of sources for each batch x tile
+        # output dimension is batch_size x n_tiles_h x n_tiles_w
+
+        # always poisson distributed.
+        p = torch.full((1,), self.mean_sources, device=self.device, dtype=torch.float)
+        m = Poisson(p)
+        n_sources = m.sample([batch_size, n_tiles_h, n_tiles_w])
+
+        # long() here is necessary because used for indexing and one_hot encoding.
+        n_sources = n_sources.clamp(max=self.max_sources, min=self.min_sources)
+        return rearrange(n_sources.long(), "b nth ntw 1 -> b nth ntw")
+
+    def _sample_locs(self, is_on_array):
+        # output dimension is batch_size x n_tiles_h x n_tiles_w x max_sources x 2
+
+        # 2 = (x,y)
+        batch_size, n_tiles_h, n_tiles_w, max_sources = is_on_array.shape
+        shape = (batch_size, n_tiles_h, n_tiles_w, max_sources, 2)
+        locs = torch.rand(*shape, device=is_on_array.device)
+        locs *= is_on_array.unsqueeze(-1)
+
+        return locs
+
+    def _sample_subhalo_params(self, is_on_array):
+        # output dimension is batch_size x n_tiles_h x n_tiles_w x 2 (alpha_Rs, Rs)
+
+        batch_size, n_tiles_h, n_tiles_w, max_sources = is_on_array.shape
+        shape = (batch_size, n_tiles_h, n_tiles_w, max_sources, 2)
+        subhalo_params = torch.zeros(shape, device=is_on_array.device)
+        subhalo_params[..., 0:1] = torch.rand(shape[:-1] + (1,)) * (self.Rs_alpha_max - self.Rs_alpha_min) + self.Rs_alpha_min
+        subhalo_params[..., 1:2] = torch.rand(shape[:-1] + (1,)) * (self.Rs_max - self.Rs_min) + self.Rs_min
+        
+        return subhalo_params * is_on_array.unsqueeze(-1)
