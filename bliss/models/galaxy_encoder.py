@@ -69,7 +69,7 @@ class GalaxyEncoder(pl.LightningModule):
         self.center_ptiles = CenterPaddedTilesTransform(self.tile_slen, self.ptile_slen)
 
         # consistency
-        assert self.slen >= 20, "Cropped slen is not reasonable for average sized galaxies."
+        # assert self.slen >= 20, "Cropped slen is not reasonable for average sized galaxies."
 
         if checkpoint_path is not None:
             self.load_state_dict(

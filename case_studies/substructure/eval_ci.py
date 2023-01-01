@@ -49,24 +49,24 @@ trials = 10_000
 num_samples = 100
 
 for trial in range(trials):
-    tile_catalog = dataset.sample_prior(
-        batch_size, cfg.datasets.simulated.n_tiles_h, cfg.datasets.simulated.n_tiles_w
-    )
-    tile_catalog.set_all_fluxes_and_mags(dataset.image_decoder)
-    images, backgrounds = dataset.simulate_image_from_catalog(tile_catalog)
+    tile_catalogs = {}
+    tile_catalogs["main_deflector"] = dataset.image_prior.sample_prior(dataset.tile_slen, batch_size, dataset.n_tiles_h, dataset.n_tiles_w)
+    if dataset.substructure_prior:
+        tile_catalogs["substructure"] = dataset.substructure_prior.sample_prior(dataset.substructure_tile_slen, batch_size, dataset.substructure_n_tiles_h, dataset.substructure_n_tiles_w)
+    images, backgrounds = dataset.simulate_image_from_catalog(tile_catalogs)
 
-    full_true = tile_catalog.cpu().to_full_params()
+    full_true = tile_catalogs["main_deflector"].to_full_params()
     img_bg = torch.cat((images[0], backgrounds[0]), dim=0).unsqueeze((0)).to(device)
 
     galaxy_samples = []
     lens_samples = []
     for _ in range(num_samples):
-        galaxy_samples.append(galaxy.sample(img_bg, tile_catalog.locs[0], deterministic=False).cpu().numpy())
-        lens_samples.append(lens.sample(img_bg, tile_catalog.locs[0], deterministic=False).cpu().numpy())
+        galaxy_samples.append(galaxy.sample(img_bg, tile_catalogs["main_deflector"].locs[0], deterministic=False).cpu().numpy())
+        lens_samples.append(lens.sample(img_bg, tile_catalogs["main_deflector"].locs[0], deterministic=False).cpu().numpy())
 
     for i, (samples_list, truth) in enumerate(zip((galaxy_samples, lens_samples), (full_true["galaxy_params"], full_true["lens_params"]))):
         samples = np.array(samples_list)
-        truth = truth.numpy()
+        truth = truth.cpu().numpy()
 
         confidence_percent = 0.90
         alpha = ((1 - confidence_percent) / 2) * 100

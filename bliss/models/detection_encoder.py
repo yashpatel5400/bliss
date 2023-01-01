@@ -301,14 +301,14 @@ class DetectionEncoder(pl.LightningModule):
                 batch["locs"][:, :, :, 0 : self.max_detections],
                 "n nth ntw ns hw -> (n nth ntw) ns hw",
             ),
-            "star_log_fluxes": rearrange(
-                batch["star_log_fluxes"][:, :, :, 0 : self.max_detections],
-                "n nth ntw ns b -> (n nth ntw) ns b",
-            ),
-            "galaxy_bools": rearrange(
-                batch["galaxy_bools"][:, :, :, 0 : self.max_detections],
-                "n nth ntw ns 1 -> (n nth ntw) ns 1",
-            ),
+            # "star_log_fluxes": rearrange(
+            #     batch["star_log_fluxes"][:, :, :, 0 : self.max_detections],
+            #     "n nth ntw ns b -> (n nth ntw) ns b",
+            # ),
+            # "galaxy_bools": rearrange(
+            #     batch["galaxy_bools"][:, :, :, 0 : self.max_detections],
+            #     "n nth ntw ns 1 -> (n nth ntw) ns 1",
+            # ),
             "n_sources": rearrange(
                 batch["n_sources"].clamp(max=self.max_detections), "n nth ntw -> (n nth ntw)"
             ),
@@ -337,27 +337,27 @@ class DetectionEncoder(pl.LightningModule):
             pred["loc_mean"].squeeze(0),
             pred["loc_sd"].squeeze(0),
         )
-        star_params_log_probs_all = _get_params_logprob_all_combs(
-            true_catalog["star_log_fluxes"],
-            pred["log_flux_mean"].squeeze(0),
-            pred["log_flux_sd"].squeeze(0),
-        )
+        # star_params_log_probs_all = _get_params_logprob_all_combs(
+        #     true_catalog["star_log_fluxes"],
+        #     pred["log_flux_mean"].squeeze(0),
+        #     pred["log_flux_sd"].squeeze(0),
+        # )
 
-        (locs_loss, star_params_loss) = _get_min_perm_loss(
+        (locs_loss, _) = _get_min_perm_loss(
             locs_log_probs_all,
-            star_params_log_probs_all,
-            rearrange(true_catalog["galaxy_bools"], "n_ptiles ns 1 -> n_ptiles ns"),
+            # star_params_log_probs_all,
+            # rearrange(true_catalog["galaxy_bools"], "n_ptiles ns 1 -> n_ptiles ns"),
             true_catalog["is_on_array"],
         )
 
-        loss_vec = locs_loss * (locs_loss.detach() < 1e6).float() + counter_loss + star_params_loss
+        loss_vec = locs_loss * (locs_loss.detach() < 1e6).float() + counter_loss# + star_params_loss
         loss = loss_vec.mean()
 
         return {
             "loss": loss,
             "counter_loss": counter_loss,
             "locs_loss": locs_loss,
-            "star_params_loss": star_params_loss,
+            # "star_params_loss": star_params_loss,
         }
 
     def validation_step(self, batch, batch_idx):
@@ -369,12 +369,12 @@ class DetectionEncoder(pl.LightningModule):
         self.log("val/loss", out["loss"], batch_size=batch_size)
         self.log("val/counter_loss", out["counter_loss"].mean(), batch_size=batch_size)
         self.log("val/locs_loss", out["locs_loss"].mean(), batch_size=batch_size)
-        self.log("val/star_params_loss", out["star_params_loss"].mean(), batch_size=batch_size)
+        # self.log("val/star_params_loss", out["star_params_loss"].mean(), batch_size=batch_size)
 
         catalog_dict = {
             "locs": batch["locs"][:, :, :, 0 : self.max_detections],
-            "star_log_fluxes": batch["star_log_fluxes"][:, :, :, 0 : self.max_detections],
-            "galaxy_bools": batch["galaxy_bools"][:, :, :, 0 : self.max_detections],
+            # "star_log_fluxes": batch["star_log_fluxes"][:, :, :, 0 : self.max_detections],
+            # "galaxy_bools": batch["galaxy_bools"][:, :, :, 0 : self.max_detections],
             "n_sources": batch["n_sources"].clamp(max=self.max_detections),
         }
         true_tile_catalog = TileCatalog(self.tile_slen, catalog_dict)
@@ -395,14 +395,15 @@ class DetectionEncoder(pl.LightningModule):
         )
         est_full_catalog = est_tile_catalog.to_full_params()
 
-        metrics = self.val_detection_metrics(true_full_catalog, est_full_catalog)
-        self.log("val/precision", metrics["precision"], batch_size=batch_size)
-        self.log("val/recall", metrics["recall"], batch_size=batch_size)
-        self.log("val/f1", metrics["f1"], batch_size=batch_size)
-        self.log("val/avg_distance", metrics["avg_distance"], batch_size=batch_size)
+        # metrics = self.val_detection_metrics(true_full_catalog, est_full_catalog)
+        # self.log("val/precision", metrics["precision"], batch_size=batch_size)
+        # self.log("val/recall", metrics["recall"], batch_size=batch_size)
+        # self.log("val/f1", metrics["f1"], batch_size=batch_size)
+        # self.log("val/avg_distance", metrics["avg_distance"], batch_size=batch_size)
         return batch
 
     def validation_epoch_end(self, outputs, kind="validation", max_n_samples=16):
+        return
         # pylint: disable=too-many-statements
         """Pytorch lightning method."""
         batch: Dict[str, Tensor] = outputs[-1]
@@ -540,19 +541,19 @@ class DetectionEncoder(pl.LightningModule):
 
 def _get_log_probs_all_perms(
     locs_log_probs_all,
-    star_params_log_probs_all,
-    true_galaxy_bools,
+    # star_params_log_probs_all,
+    # true_galaxy_bools,
     is_on_array,
 ):
     # get log-probability under every possible matching of estimated source to true source
-    n_ptiles = star_params_log_probs_all.size(0)
-    max_detections = star_params_log_probs_all.size(-1)
+    n_ptiles = is_on_array.size(0)
+    max_detections = is_on_array.size(-1)
 
     n_permutations = math.factorial(max_detections)
     locs_log_probs_all_perm = torch.zeros(
         n_ptiles, n_permutations, device=locs_log_probs_all.device
     )
-    star_params_log_probs_all_perm = locs_log_probs_all_perm.clone()
+    # star_params_log_probs_all_perm = locs_log_probs_all_perm.clone()
 
     for i, perm in enumerate(itertools.permutations(range(max_detections))):
         # note that we multiply is_on_array, we only evaluate the loss if the source is on.
@@ -564,26 +565,26 @@ def _get_log_probs_all_perms(
         # hence the multiplication by (1 - true_galaxy_bools)
         # the diagonal is a clever way of selecting the elements of each permutation (first index
         # of mean/var with second index of true_param etc.)
-        star_params_log_probs_all_perm[:, i] = (
-            star_params_log_probs_all[:, perm].diagonal(dim1=1, dim2=2)
-            * is_on_array
-            * (1 - true_galaxy_bools)
-        ).sum(1)
+        # star_params_log_probs_all_perm[:, i] = (
+        #     star_params_log_probs_all[:, perm].diagonal(dim1=1, dim2=2)
+        #     * is_on_array
+        #     * (1 - true_galaxy_bools)
+        # ).sum(1)
 
-    return locs_log_probs_all_perm, star_params_log_probs_all_perm
+    return locs_log_probs_all_perm, None
 
 
 def _get_min_perm_loss(
     locs_log_probs_all,
-    star_params_log_probs_all,
-    true_galaxy_bools,
+    # star_params_log_probs_all,
+    # true_galaxy_bools,
     is_on_array,
 ):
     # get log-probability under every possible matching of estimated star to true star
-    locs_log_probs_all_perm, star_params_log_probs_all_perm = _get_log_probs_all_perms(
+    locs_log_probs_all_perm, _ = _get_log_probs_all_perms(
         locs_log_probs_all,
-        star_params_log_probs_all,
-        true_galaxy_bools,
+        # star_params_log_probs_all,
+        # true_galaxy_bools,
         is_on_array,
     )
 
@@ -592,8 +593,8 @@ def _get_min_perm_loss(
     indx = indx.unsqueeze(1)
 
     # get the star losses according to the found permutation.
-    star_params_loss = -torch.gather(star_params_log_probs_all_perm, 1, indx).squeeze()
-    return locs_loss, star_params_loss
+    # star_params_loss = -torch.gather(star_params_log_probs_all_perm, 1, indx).squeeze()
+    return locs_loss, None #star_params_loss
 
 
 def _get_params_logprob_all_combs(true_params, param_mean, param_sd):

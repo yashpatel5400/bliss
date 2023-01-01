@@ -33,7 +33,7 @@ datasets:
         substructure_tile_slen: 4
         substructure_n_tiles_h: 14
         substructure_n_tiles_w: 14
-        train_tag: "substructure"
+        train_tag: "main_deflector"
         background:
             _target_: bliss.datasets.background.SimulatedSDSSBackground
             sdss_dir: ${paths.sdss}
@@ -84,13 +84,13 @@ models:
             psf_slen: 25
             sdss_bands:
                 - 2
-    detection_encoder:
+    subhalo_detection_encoder:
         _target_: bliss.models.detection_encoder.DetectionEncoder
         input_transform:
             _target_: bliss.models.detection_encoder.ConcatBackgroundTransform
         n_bands: ${models.decoder.n_bands}
         tile_slen: ${models.decoder.tile_slen}
-        ptile_slen: ${models.decoder.ptile_slen}
+        ptile_slen: 32
         max_detections: ${models.prior.max_sources}
         channel: 8
         spatial_dropout: 0.0

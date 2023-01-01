@@ -12,4 +12,4 @@ training:
 
 datasets:
     simulated:
-        train_tag: "subhalos"
+        train_tag: "substructure"
