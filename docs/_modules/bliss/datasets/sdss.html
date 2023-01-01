@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bliss.datasets.sdss &mdash; bliss  documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/sphinx_highlight.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> bliss
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../Installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/index.html">Bliss API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">bliss</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">bliss.datasets.sdss</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for bliss.datasets.sdss</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
+<span class="kn">from</span> <span class="nn">astropy.wcs</span> <span class="kn">import</span> <span class="n">WCS</span><span class="p">,</span> <span class="n">FITSFixedWarning</span>
+<span class="kn">from</span> <span class="nn">einops</span> <span class="kn">import</span> <span class="n">rearrange</span>
+<span class="kn">from</span> <span class="nn">scipy.interpolate</span> <span class="kn">import</span> <span class="n">RegularGridInterpolator</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">Dataset</span>
+
+
+<span class="k">def</span> <span class="nf">convert_mag_to_flux</span><span class="p">(</span><span class="n">mag</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">nelec_per_nmgy</span><span class="o">=</span><span class="mf">987.31</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="c1"># default corresponds to average value of columns for run 94, camcol 1, field 12</span>
+    <span class="k">return</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">((</span><span class="mf">22.5</span> <span class="o">-</span> <span class="n">mag</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.5</span><span class="p">)</span> <span class="o">*</span> <span class="n">nelec_per_nmgy</span>
+
+
+<span class="k">def</span> <span class="nf">convert_flux_to_mag</span><span class="p">(</span><span class="n">flux</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">nelec_per_nmgy</span><span class="o">=</span><span class="mf">987.31</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+    <span class="c1"># default corresponds to average value of columns for run 94, camcol 1, field 12</span>
+    <span class="k">return</span> <span class="mf">22.5</span> <span class="o">-</span> <span class="mf">2.5</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">flux</span> <span class="o">/</span> <span class="n">nelec_per_nmgy</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SloanDigitalSkySurvey"><a class="viewcode-back" href="../../../api/bliss.datasets.html#bliss.datasets.sdss.SloanDigitalSkySurvey">[docs]</a><span class="k">class</span> <span class="nc">SloanDigitalSkySurvey</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">sdss_dir</span><span class="o">=</span><span class="s2">&quot;data/sdss&quot;</span><span class="p">,</span>
+        <span class="n">run</span><span class="o">=</span><span class="mi">3900</span><span class="p">,</span>
+        <span class="n">camcol</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+        <span class="n">fields</span><span class="o">=</span><span class="p">(</span><span class="mi">269</span><span class="p">,),</span>
+        <span class="n">bands</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">sdss_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">sdss_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rcfgcs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bands</span> <span class="o">=</span> <span class="n">bands</span>
+        <span class="n">pf_file</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;photoField-</span><span class="si">{</span><span class="n">run</span><span class="si">:</span><span class="s2">06d</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">camcol</span><span class="si">:</span><span class="s2">d</span><span class="si">}</span><span class="s2">.fits&quot;</span>
+        <span class="n">camcol_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sdss_path</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">run</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">camcol</span><span class="p">))</span>
+        <span class="n">pf_path</span> <span class="o">=</span> <span class="n">camcol_path</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="n">pf_file</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pf_fits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="n">pf_path</span><span class="p">)</span>
+
+        <span class="n">fieldnums</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pf_fits</span><span class="p">[</span><span class="s2">&quot;FIELD&quot;</span><span class="p">]</span>
+        <span class="n">fieldgains</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pf_fits</span><span class="p">[</span><span class="s2">&quot;GAIN&quot;</span><span class="p">]</span>
+
+        <span class="c1"># get desired field</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fieldnums</span><span class="p">):</span>
+            <span class="n">gain</span> <span class="o">=</span> <span class="n">fieldgains</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">fields</span><span class="p">)</span> <span class="ow">or</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">rcfgcs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">run</span><span class="p">,</span> <span class="n">camcol</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">gain</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfgcs</span><span class="p">))]</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rcfgcs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">[</span><span class="n">idx</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_from_disk</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">get_from_disk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rcfgcs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">run</span><span class="p">,</span> <span class="n">camcol</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">gain</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rcfgcs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+
+        <span class="n">camcol_dir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sdss_path</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">run</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">camcol</span><span class="p">))</span>
+        <span class="n">field_dir</span> <span class="o">=</span> <span class="n">camcol_dir</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">field</span><span class="p">))</span>
+        <span class="n">frame_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">b</span><span class="p">,</span> <span class="n">bl</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="s2">&quot;ugriz&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">b</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bands</span><span class="p">:</span>
+                <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_frame_for_band</span><span class="p">(</span><span class="n">bl</span><span class="p">,</span> <span class="n">field_dir</span><span class="p">,</span> <span class="n">run</span><span class="p">,</span> <span class="n">camcol</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">gain</span><span class="p">[</span><span class="n">b</span><span class="p">])</span>
+                <span class="n">frame_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+
+        <span class="n">ret</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">frame_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">data_per_band</span> <span class="o">=</span> <span class="p">[</span><span class="n">frame</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">frame_list</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data_per_band</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+                <span class="n">ret</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">data_per_band</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ret</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_per_band</span>
+        <span class="n">ret</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;field&quot;</span><span class="p">:</span> <span class="n">field</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">ret</span>
+
+    <span class="k">def</span> <span class="nf">read_frame_for_band</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bl</span><span class="p">,</span> <span class="n">field_dir</span><span class="p">,</span> <span class="n">run</span><span class="p">,</span> <span class="n">camcol</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">gain</span><span class="p">):</span>
+        <span class="n">frame_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;frame-</span><span class="si">{</span><span class="n">bl</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">run</span><span class="si">:</span><span class="s2">06d</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">camcol</span><span class="si">:</span><span class="s2">d</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">field</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">.fits&quot;</span>
+        <span class="n">frame_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">field_dir</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="n">frame_name</span><span class="p">))</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">frame_path</span><span class="p">)</span>
+        <span class="n">calibration</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">data</span>  <span class="c1"># pylint: disable=maybe-no-member</span>
+        <span class="n">nelec_per_nmgy</span> <span class="o">=</span> <span class="n">gain</span> <span class="o">/</span> <span class="n">calibration</span>
+
+        <span class="n">sky_small</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;ALLSKY&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># pylint: disable=maybe-no-member</span>
+        <span class="n">sky_x</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;XINTERP&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># pylint: disable=maybe-no-member</span>
+        <span class="n">sky_y</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;YINTERP&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># pylint: disable=maybe-no-member</span>
+
+        <span class="n">small_rows</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span><span class="mi">0</span> <span class="p">:</span> <span class="n">sky_small</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="n">small_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span><span class="mi">0</span> <span class="p">:</span> <span class="n">sky_small</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="n">small_rcs</span> <span class="o">=</span> <span class="p">(</span><span class="n">small_rows</span><span class="p">,</span> <span class="n">small_cols</span><span class="p">)</span>
+        <span class="n">sky_interp</span> <span class="o">=</span> <span class="n">RegularGridInterpolator</span><span class="p">(</span><span class="n">small_rcs</span><span class="p">,</span> <span class="n">sky_small</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">)</span>
+
+        <span class="n">sky_y</span> <span class="o">=</span> <span class="n">sky_y</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">sky_small</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">sky_x</span> <span class="o">=</span> <span class="n">sky_x</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">sky_small</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">large_points</span> <span class="o">=</span> <span class="n">rearrange</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">sky_y</span><span class="p">,</span> <span class="n">sky_x</span><span class="p">),</span> <span class="s2">&quot;n x y -&gt; y x n&quot;</span><span class="p">)</span>
+        <span class="n">large_sky</span> <span class="o">=</span> <span class="n">sky_interp</span><span class="p">(</span><span class="n">large_points</span><span class="p">)</span>
+        <span class="n">large_sky_nelec</span> <span class="o">=</span> <span class="n">large_sky</span> <span class="o">*</span> <span class="n">gain</span>
+
+        <span class="n">pixels_ss_nmgy</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span>  <span class="c1"># pylint: disable=maybe-no-member</span>
+        <span class="n">pixels_ss_nelec</span> <span class="o">=</span> <span class="n">pixels_ss_nmgy</span> <span class="o">*</span> <span class="n">nelec_per_nmgy</span>
+        <span class="n">pixels_nelec</span> <span class="o">=</span> <span class="n">pixels_ss_nelec</span> <span class="o">+</span> <span class="n">large_sky_nelec</span>
+
+        <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">FITSFixedWarning</span><span class="p">)</span>
+            <span class="n">wcs</span> <span class="o">=</span> <span class="n">WCS</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">frame</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;image&quot;</span><span class="p">:</span> <span class="n">pixels_nelec</span><span class="p">,</span>
+            <span class="s2">&quot;background&quot;</span><span class="p">:</span> <span class="n">large_sky_nelec</span><span class="p">,</span>
+            <span class="s2">&quot;gain&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">gain</span><span class="p">),</span>
+            <span class="s2">&quot;nelec_per_nmgy_list&quot;</span><span class="p">:</span> <span class="n">nelec_per_nmgy</span><span class="p">,</span>
+            <span class="s2">&quot;calibration&quot;</span><span class="p">:</span> <span class="n">calibration</span><span class="p">,</span>
+            <span class="s2">&quot;wcs&quot;</span><span class="p">:</span> <span class="n">wcs</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<span class="k">def</span> <span class="nf">column_to_tensor</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">colname</span><span class="p">):</span>
+    <span class="n">dtypes</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;&gt;i2&quot;</span><span class="p">):</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;&gt;i4&quot;</span><span class="p">):</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;&gt;i8&quot;</span><span class="p">):</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">):</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;&gt;f4&quot;</span><span class="p">):</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;&gt;f8&quot;</span><span class="p">):</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;float32&quot;</span><span class="p">):</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">):</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="n">colname</span><span class="p">])</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">dtypes</span><span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Probabilistic Machine Learning Research Group.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

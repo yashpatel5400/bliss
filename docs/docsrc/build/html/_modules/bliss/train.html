@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bliss.train &mdash; bliss  documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> bliss
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../Installation.html">Installation Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/index.html">Bliss API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">bliss</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">bliss.train</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for bliss.train</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">datetime</span> <span class="k">as</span> <span class="nn">dt</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">time_ns</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span> <span class="nn">pytorch_lightning</span> <span class="k">as</span> <span class="nn">pl</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">hydra.utils</span> <span class="kn">import</span> <span class="n">instantiate</span>
+<span class="kn">from</span> <span class="nn">omegaconf</span> <span class="kn">import</span> <span class="n">DictConfig</span><span class="p">,</span> <span class="n">OmegaConf</span>
+<span class="kn">from</span> <span class="nn">pytorch_lightning.callbacks</span> <span class="kn">import</span> <span class="n">ModelCheckpoint</span>
+<span class="kn">from</span> <span class="nn">pytorch_lightning.loggers</span> <span class="kn">import</span> <span class="n">TensorBoardLogger</span>
+<span class="kn">from</span> <span class="nn">pytorch_lightning.profiler</span> <span class="kn">import</span> <span class="n">AdvancedProfiler</span>
+<span class="kn">from</span> <span class="nn">pytorch_lightning.utilities</span> <span class="kn">import</span> <span class="n">rank_zero_only</span>
+
+
+<span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">cfg</span><span class="p">:</span> <span class="n">DictConfig</span><span class="p">):</span>
+
+    <span class="c1"># setup paths and seed</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="n">OmegaConf</span><span class="o">.</span><span class="n">to_container</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">paths</span><span class="p">,</span> <span class="n">resolve</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">paths</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">paths</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;output&quot;</span><span class="p">:</span>
+                <span class="n">path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">err</span> <span class="o">=</span> <span class="s2">&quot;path for </span><span class="si">{}</span><span class="s2"> (</span><span class="si">{}</span><span class="s2">) does not exist&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">path</span><span class="o">.</span><span class="n">as_posix</span><span class="p">())</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">seed_everything</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">seed</span><span class="p">)</span>
+    
+    <span class="c1"># need to map: lr -&gt; lr * GPUs, batch_size -&gt; batch_size / GPUs to maintain</span>
+    <span class="c1"># https://forums.pytorchlightning.ai/t/effective-learning-rate-and-batch-size-with-lightning-in-ddp/101</span>
+    <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">optimizer_params</span><span class="p">[</span><span class="s2">&quot;lr&quot;</span><span class="p">]</span> <span class="o">*=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">trainer</span><span class="o">.</span><span class="n">gpus</span>
+    <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">batch_size</span> <span class="o">//=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">trainer</span><span class="o">.</span><span class="n">gpus</span>
+
+    <span class="c1"># setup dataset.</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">instantiate</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">dataset</span><span class="p">)</span>
+
+    <span class="c1"># setup model</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">instantiate</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer_params</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">optimizer_params</span><span class="p">)</span>
+
+    <span class="c1"># setup trainer</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">setup_logger</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">paths</span><span class="p">)</span>
+    <span class="n">checkpoint_callback</span> <span class="o">=</span> <span class="n">setup_callbacks</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+    <span class="n">profiler</span> <span class="o">=</span> <span class="n">setup_profiler</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+
+    <span class="n">callbacks</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">checkpoint_callback</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[</span><span class="n">checkpoint_callback</span><span class="p">]</span>
+
+    <span class="n">trainer</span> <span class="o">=</span> <span class="n">instantiate</span><span class="p">(</span>
+        <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">trainer</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">logger</span><span class="p">,</span> <span class="n">profiler</span><span class="o">=</span><span class="n">profiler</span><span class="p">,</span> <span class="n">callbacks</span><span class="o">=</span><span class="n">callbacks</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">logger</span><span class="p">:</span>
+        <span class="n">log_hyperparameters</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">cfg</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">trainer</span><span class="o">=</span><span class="n">trainer</span><span class="p">)</span>
+
+    <span class="c1"># train!</span>
+    <span class="n">tic</span> <span class="o">=</span> <span class="n">time_ns</span><span class="p">()</span>
+    <span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">datamodule</span><span class="o">=</span><span class="n">dataset</span><span class="p">)</span>
+    <span class="n">toc</span> <span class="o">=</span> <span class="n">time_ns</span><span class="p">()</span>
+    <span class="n">train_time_sec</span> <span class="o">=</span> <span class="p">(</span><span class="n">toc</span> <span class="o">-</span> <span class="n">tic</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1e-9</span>
+    <span class="c1"># test!</span>
+    <span class="k">if</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">trainer</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">datamodule</span><span class="o">=</span><span class="n">dataset</span><span class="p">)</span>
+
+    <span class="c1"># Load best weights from checkpoint</span>
+    <span class="k">if</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">weight_save_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">checkpoint_callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="n">model_checkpoint</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">checkpoint_callback</span><span class="o">.</span><span class="n">best_model_path</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+        <span class="n">model_state_dict</span> <span class="o">=</span> <span class="n">model_checkpoint</span><span class="p">[</span><span class="s2">&quot;state_dict&quot;</span><span class="p">]</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">weight_save_path</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model_state_dict</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">weight_save_path</span><span class="p">)</span>
+        <span class="n">result_path</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">weight_save_path</span> <span class="o">+</span> <span class="s2">&quot;.log.json&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">result_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">cp_data</span> <span class="o">=</span> <span class="n">model_checkpoint</span><span class="p">[</span><span class="s2">&quot;callbacks&quot;</span><span class="p">]</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">cp_data</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">cp_data</span> <span class="o">=</span> <span class="n">cp_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="n">data_to_write</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">dt</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">today</span><span class="p">()),</span>
+                <span class="s2">&quot;train_time_sec&quot;</span><span class="p">:</span> <span class="n">train_time_sec</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">cp_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">v</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                    <span class="n">data_to_write</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="n">is_json_serializable</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+                    <span class="n">data_to_write</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+            <span class="n">fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data_to_write</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">setup_logger</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="n">paths</span><span class="p">):</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">trainer</span><span class="o">.</span><span class="n">logger</span><span class="p">:</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">TensorBoardLogger</span><span class="p">(</span>
+            <span class="n">save_dir</span><span class="o">=</span><span class="n">paths</span><span class="p">[</span><span class="s2">&quot;output&quot;</span><span class="p">],</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">experiment</span><span class="p">,</span>
+            <span class="n">version</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+            <span class="n">default_hp_metric</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">logger</span>
+
+
+<span class="k">def</span> <span class="nf">setup_callbacks</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ModelCheckpoint</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">trainer</span><span class="o">.</span><span class="n">enable_checkpointing</span><span class="p">:</span>
+        <span class="n">checkpoint_callback</span> <span class="o">=</span> <span class="n">ModelCheckpoint</span><span class="p">(</span>
+            <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;epoch=</span><span class="si">{epoch}</span><span class="s2">-val_loss={val/loss:.3f}&quot;</span><span class="p">,</span>
+            <span class="n">save_top_k</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">save_top_k</span><span class="p">,</span>
+            <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">monitor</span><span class="o">=</span><span class="s2">&quot;val/loss&quot;</span><span class="p">,</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;min&quot;</span><span class="p">,</span>
+            <span class="n">save_on_train_epoch_end</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">auto_insert_metric_name</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">checkpoint_callback</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">checkpoint_callback</span>
+
+
+<span class="k">def</span> <span class="nf">setup_profiler</span><span class="p">(</span><span class="n">cfg</span><span class="p">):</span>
+    <span class="n">profiler</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">cfg</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">trainer</span><span class="o">.</span><span class="n">profiler</span><span class="p">:</span>
+        <span class="n">profiler</span> <span class="o">=</span> <span class="n">AdvancedProfiler</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s2">&quot;profile.txt&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">profiler</span>
+
+
+<span class="c1"># https://github.com/ashleve/lightning-hydra-template/blob/main/src/utils/utils.py</span>
+<div class="viewcode-block" id="log_hyperparameters"><a class="viewcode-back" href="../../api/bliss.html#bliss.train.log_hyperparameters">[docs]</a><span class="nd">@rank_zero_only</span>
+<span class="k">def</span> <span class="nf">log_hyperparameters</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">trainer</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Log config and num of model parameters to all Lightning loggers.&quot;&quot;&quot;</span>
+
+    <span class="n">hparams</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># choose which parts of hydra config will be saved to loggers</span>
+    <span class="n">hparams</span><span class="p">[</span><span class="s2">&quot;mode&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;mode&quot;</span><span class="p">]</span>
+    <span class="n">hparams</span><span class="p">[</span><span class="s2">&quot;training&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;training&quot;</span><span class="p">]</span>
+    <span class="n">hparams</span><span class="p">[</span><span class="s2">&quot;optimizer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;training&quot;</span><span class="p">][</span><span class="s2">&quot;optimizer_params&quot;</span><span class="p">]</span>
+
+    <span class="c1"># save number of model parameters</span>
+    <span class="n">hparams</span><span class="p">[</span><span class="s2">&quot;model/params_total&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span>
+    <span class="n">hparams</span><span class="p">[</span><span class="s2">&quot;model/params_trainable&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span>
+    <span class="p">)</span>
+    <span class="n">hparams</span><span class="p">[</span><span class="s2">&quot;model/params_not_trainable&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span>
+    <span class="p">)</span>
+
+    <span class="c1"># send hparams to all loggers</span>
+    <span class="n">trainer</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">log_hyperparams</span><span class="p">(</span><span class="n">hparams</span><span class="p">)</span>
+
+    <span class="c1"># trick to disable logging any more hyperparameters for all loggers</span>
+    <span class="n">trainer</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">log_hyperparams</span> <span class="o">=</span> <span class="n">empty</span></div>
+
+
+<span class="k">def</span> <span class="nf">empty</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+
+<span class="k">def</span> <span class="nf">is_json_serializable</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="n">ret</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">ret</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Probabilistic Machine Learning Research Group.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

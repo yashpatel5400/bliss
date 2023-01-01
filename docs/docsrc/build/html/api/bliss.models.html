@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bliss.models package &mdash; bliss  documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="bliss.datasets package" href="bliss.datasets.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> bliss
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../Installation.html">Installation Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Bliss API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="bliss.html">bliss package</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="bliss.datasets.html">bliss.datasets package</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">bliss.models package</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">bliss</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Bliss API</a></li>
+          <li class="breadcrumb-item"><a href="bliss.html">bliss package</a></li>
+      <li class="breadcrumb-item active">bliss.models package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/bliss.models.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="bliss-models-package">
+<h1>bliss.models package<a class="headerlink" href="#bliss-models-package" title="Permalink to this heading"></a></h1>
+<section id="module-bliss.models.decoder">
+<span id="bliss-models-decoder-module"></span><h2>bliss.models.decoder module<a class="headerlink" href="#module-bliss.models.decoder" title="Permalink to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.decoder.GalaxyDecoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.decoder.</span></span><span class="sig-name descname"><span class="pre">GalaxyDecoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tile_slen</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptile_slen</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bands</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">galaxy_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><span class="pre">Union</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE" title="bliss.models.galaxy_net.OneCenteredGalaxyAE"><span class="pre">OneCenteredGalaxyAE</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">SingleGalsimGalaxyDecoder</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#GalaxyDecoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.GalaxyDecoder" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.decoder.GalaxyDecoder.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">galaxy_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">galaxy_bools</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#GalaxyDecoder.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.GalaxyDecoder.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Renders galaxy tile from locations and galaxy parameters.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.decoder.</span></span><span class="sig-name descname"><span class="pre">ImageDecoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_bands</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">tile_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptile_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">psf_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">sdss_bands</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psf_params_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">border_padding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">galaxy_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><span class="pre">Union</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE" title="bliss.models.galaxy_net.OneCenteredGalaxyAE"><span class="pre">OneCenteredGalaxyAE</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">SingleGalsimGalaxyDecoder</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lens_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><span class="pre">SingleLensedGalsimGalaxyDecoder</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#ImageDecoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.ImageDecoder" title="Permalink to this definition"></a></dt>
+<dd><p>Decodes latent variables into reconstructed astronomical image.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.n_bands">
+<span class="sig-name descname"><span class="pre">n_bands</span></span><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.n_bands" title="Permalink to this definition"></a></dt>
+<dd><p>Number of bands (colors) in the image</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.tile_slen">
+<span class="sig-name descname"><span class="pre">tile_slen</span></span><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.tile_slen" title="Permalink to this definition"></a></dt>
+<dd><p>Side-length of each tile.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.ptile_slen">
+<span class="sig-name descname"><span class="pre">ptile_slen</span></span><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.ptile_slen" title="Permalink to this definition"></a></dt>
+<dd><p>Padded side-length of each tile (for reconstructing image).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.border_padding">
+<span class="sig-name descname"><span class="pre">border_padding</span></span><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.border_padding" title="Permalink to this definition"></a></dt>
+<dd><p>Size of border around the final image where sources will not be present.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.star_tile_decoder">
+<span class="sig-name descname"><span class="pre">star_tile_decoder</span></span><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.star_tile_decoder" title="Permalink to this definition"></a></dt>
+<dd><p>Module which renders stars on individual tiles.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.galaxy_tile_decoder">
+<span class="sig-name descname"><span class="pre">galaxy_tile_decoder</span></span><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.galaxy_tile_decoder" title="Permalink to this definition"></a></dt>
+<dd><p>Module which renders galaxies on individual tiles.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#ImageDecoder.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Decodes latent representation into an image.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.decoder.ImageDecoder.render_images">
+<span class="sig-name descname"><span class="pre">render_images</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tile_catalog</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TileCatalog</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></span><a class="reference internal" href="../_modules/bliss/models/decoder.html#ImageDecoder.render_images"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.ImageDecoder.render_images" title="Permalink to this definition"></a></dt>
+<dd><p>Renders tile catalog latent variables into a full astronomical image.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>tile_catalog</strong> – Tile catalog of astronomical image, comprising tensors
+of size (batch_size x n_tiles_h x n_tiles_w x max_sources). The only
+exception is ‘n_sources`, which is size batch_size x n_tiles_h x n_tiles_w.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The <strong>full</strong> image in shape (batch_size x n_bands x slen x slen).</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.decoder.LensedGalaxyTileDecoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.decoder.</span></span><span class="sig-name descname"><span class="pre">LensedGalaxyTileDecoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tile_slen</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptile_slen</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bands</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lens_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SingleLensedGalsimGalaxyDecoder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#LensedGalaxyTileDecoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.LensedGalaxyTileDecoder" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.decoder.LensedGalaxyTileDecoder.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lens_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lensed_galaxy_bools</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#LensedGalaxyTileDecoder.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.LensedGalaxyTileDecoder.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Renders galaxy tile from locations and galaxy parameters.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.decoder.StarPSFDecoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.decoder.</span></span><span class="sig-name descname"><span class="pre">StarPSFDecoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_bands</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pixel_scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.11)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.393</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psf_gauss_fwhm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.11)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psf_params_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psf_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sdss_bands</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#StarPSFDecoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.StarPSFDecoder" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.decoder.StarPSFDecoder.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fluxes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">star_bools</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptile_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#StarPSFDecoder.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.StarPSFDecoder.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Renders star tile from locations and fluxes.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.decoder.TileRenderer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.decoder.</span></span><span class="sig-name descname"><span class="pre">TileRenderer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tile_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptile_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#TileRenderer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.TileRenderer" title="Permalink to this definition"></a></dt>
+<dd><p>This class creates an image tile from multiple sources.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.decoder.TileRenderer.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">locs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">sources</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#TileRenderer.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.TileRenderer.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Renders tile from locations and sources.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>locs</strong> – is (n_ptiles x max_num_stars x 2)</p></li>
+<li><p><strong>sources</strong> – is (n_ptiles x max_num_stars x n_bands x stampsize x stampsize)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>ptile = (n_ptiles x n_bands x slen x slen)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bliss.models.decoder.expand_source">
+<span class="sig-prename descclassname"><span class="pre">bliss.models.decoder.</span></span><span class="sig-name descname"><span class="pre">expand_source</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptile_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#expand_source"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.expand_source" title="Permalink to this definition"></a></dt>
+<dd><p>Pad the source with zeros so that it is size ptile_slen.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="bliss.models.decoder.trim_source">
+<span class="sig-prename descclassname"><span class="pre">bliss.models.decoder.</span></span><span class="sig-name descname"><span class="pre">trim_source</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ptile_slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/decoder.html#trim_source"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.decoder.trim_source" title="Permalink to this definition"></a></dt>
+<dd><p>Crop the source to length ptile_slen x ptile_slen, centered at the middle.</p>
+</dd></dl>
+
+</section>
+<section id="bliss-models-encoder-module">
+<h2>bliss.models.encoder module<a class="headerlink" href="#bliss-models-encoder-module" title="Permalink to this heading"></a></h2>
+</section>
+<section id="bliss-models-fnp-module">
+<h2>bliss.models.fnp module<a class="headerlink" href="#bliss-models-fnp-module" title="Permalink to this heading"></a></h2>
+</section>
+<section id="module-bliss.models.galaxy_net">
+<span id="bliss-models-galaxy-net-module"></span><h2>bliss.models.galaxy_net module<a class="headerlink" href="#module-bliss.models.galaxy_net" title="Permalink to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.CenteredGalaxyDecoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.galaxy_net.</span></span><span class="sig-name descname"><span class="pre">CenteredGalaxyDecoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">slen</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">53</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">latent_dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bands</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_weight_norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#CenteredGalaxyDecoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.CenteredGalaxyDecoder" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.CenteredGalaxyDecoder.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">z</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#CenteredGalaxyDecoder.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.CenteredGalaxyDecoder.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Decodes image from latent representation.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.CenteredGalaxyEncoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.galaxy_net.</span></span><span class="sig-name descname"><span class="pre">CenteredGalaxyEncoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">slen</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">latent_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bands</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_weight_norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#CenteredGalaxyEncoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.CenteredGalaxyEncoder" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.CenteredGalaxyEncoder.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#CenteredGalaxyEncoder.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.CenteredGalaxyEncoder.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Encodes galaxy from image.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">bliss.models.galaxy_net.</span></span><span class="sig-name descname"><span class="pre">OneCenteredGalaxyAE</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">slen</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">latent_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">hidden</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_bands</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimizer_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.11)"><span class="pre">dict</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ckpt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.configure_optimizers">
+<span class="sig-name descname"><span class="pre">configure_optimizers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.configure_optimizers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.configure_optimizers" title="Permalink to this definition"></a></dt>
+<dd><p>Configures optimizers for training (pytorch lightning).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">background</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.forward" title="Permalink to this definition"></a></dt>
+<dd><p>Same as <a class="reference external" href="https://pytorch.org/docs/master/generated/torch.nn.Module.html#torch.nn.Module.forward" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><code class="xref py py-meth docutils literal notranslate"><span class="pre">torch.nn.Module.forward()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>*args</strong> – Whatever you decide to pass into the forward method.</p></li>
+<li><p><strong>**kwargs</strong> – Keyword arguments are also possible.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Your model’s output</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.generate_latents">
+<span class="sig-name descname"><span class="pre">generate_latents</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataloader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_batches</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.generate_latents"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.generate_latents" title="Permalink to this definition"></a></dt>
+<dd><p>Induces a latent distribution for a non-probabilistic autoencoder.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.reconstruct">
+<span class="sig-name descname"><span class="pre">reconstruct</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">background</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (2.0.0a0+git39d49db ))"><span class="pre">Tensor</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.reconstruct"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.reconstruct" title="Permalink to this definition"></a></dt>
+<dd><p>Gets reconstructed image from running through encoder and decoder.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.test_step">
+<span class="sig-name descname"><span class="pre">test_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_idx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.test_step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.test_step" title="Permalink to this definition"></a></dt>
+<dd><p>Testing step (pytorch lightning).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.training_step">
+<span class="sig-name descname"><span class="pre">training_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_idx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.training_step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.training_step" title="Permalink to this definition"></a></dt>
+<dd><p>Training step (pytorch lightning).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.validation_epoch_end">
+<span class="sig-name descname"><span class="pre">validation_epoch_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outputs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.validation_epoch_end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.validation_epoch_end" title="Permalink to this definition"></a></dt>
+<dd><p>Validation epoch end (pytorch lightning).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="bliss.models.galaxy_net.OneCenteredGalaxyAE.validation_step">
+<span class="sig-name descname"><span class="pre">validation_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_idx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/bliss/models/galaxy_net.html#OneCenteredGalaxyAE.validation_step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#bliss.models.galaxy_net.OneCenteredGalaxyAE.validation_step" title="Permalink to this definition"></a></dt>
+<dd><p>Validation step (pytorch lightning).</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="bliss.datasets.html" class="btn btn-neutral float-left" title="bliss.datasets package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Probabilistic Machine Learning Research Group.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
